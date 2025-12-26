@@ -9,3 +9,4 @@ export { default as AddressLink } from './AddressLink';
 export { default as BalanceList } from './BalanceList';
 export { default as NetworkSelector } from './NetworkSelector';
 export { NetworkProvider, useNetwork } from './NetworkContext';
+export { ServiceWorkerRegistration } from './ServiceWorker';
