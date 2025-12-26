@@ -190,31 +190,52 @@ export default function ScanPage() {
         <p className="error">error: {activityError}</p>
       ) : activity.length === 0 ? (
         <p>no recent activity</p>
-      ) : (
-        <>
-          <div className="transfer-list">
-            {activity.map((t, index) => {
-              const ft = formatTransfer(t);
-              return (
-                <p key={`${t.txHash}-${index}`} className="transfer-item">
-                  <AddressLink address={t.from} />
-                  {' -> '}
-                  <AddressLink address={t.to} />
-                  {': '}
-                  {ft.formattedAmount}{' '}
-                  <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                  <br />
-                  <small>{formatTimestamp(t.timestamp)} (<Link href={`/tx/${t.txHash}`}>{t.txHash?.substring(0, 4)}</Link>)</small>
-                </p>
-              );
-            })}
-          </div>
+      ) : (() => {
+        // Group transfers by transaction hash
+        const txGroups = [];
+        const txMap = new Map();
+        for (const item of activity) {
+          if (!txMap.has(item.txHash)) {
+            const group = { txHash: item.txHash, timestamp: item.timestamp, events: [] };
+            txMap.set(item.txHash, group);
+            txGroups.push(group);
+          }
+          txMap.get(item.txHash).events.push(item);
+        }
 
-          <p>
-            <a href="#" onClick={(e) => { e.preventDefault(); loadRecentActivity(); }}>refresh</a>
-          </p>
-        </>
-      )}
+        return (
+          <>
+            <div className="transfer-list">
+              {txGroups.map((group) => (
+                <div key={group.txHash} className="tx-group">
+                  {group.events.map((t, eventIndex) => {
+                    const ft = formatTransfer(t);
+                    return (
+                      <p key={eventIndex} className="transfer-item">
+                        <AddressLink address={t.from} />
+                        {' → '}
+                        <AddressLink address={t.to} />
+                        {': '}
+                        {ft.formattedAmount}{' '}
+                        <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
+                      </p>
+                    );
+                  })}
+                  <small>
+                    {formatTimestamp(group.timestamp)}
+                    {' '}
+                    (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
+                  </small>
+                </div>
+              ))}
+            </div>
+
+            <p>
+              <a href="#" onClick={(e) => { e.preventDefault(); loadRecentActivity(); }}>refresh</a>
+            </p>
+          </>
+        );
+      })()}
     </div>
   );
 }

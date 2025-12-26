@@ -17,6 +17,7 @@ import { formatTimestamp } from '@/utils/scan/helpers';
 import {
   ScanHeader,
   AddressDisplay,
+  AddressLink,
   BalanceList,
   useNetwork,
 } from '@/app/components';
@@ -322,21 +323,25 @@ export default function AccountPage({ params }) {
                                   {formatted.isRefund ? '+' : '-'}{formatted.formattedAmount} XLM
                                 </span>
                                 {' '}
-                                <span style={{ color: 'var(--text-secondary)' }}>
+                                <span className="text-secondary">
                                   ({formatted.isRefund ? 'refund' : 'fee'})
                                 </span>
                               </>
                             ) : (
-                              // Transfer event display
+                              // Transfer event display - arrow format matching main page
                               <>
-                                {item.direction === 'sent' ? 'sent ' : 'received '}
+                                <AddressLink
+                                  address={item.from}
+                                  display={item.from === address ? 'you' : undefined}
+                                />
+                                {' → '}
+                                <AddressLink
+                                  address={item.to}
+                                  display={item.to === address ? 'you' : undefined}
+                                />
+                                {': '}
                                 {formatted.formattedAmount}{' '}
                                 <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                                {' '}
-                                {item.direction === 'sent' ? 'to ' : 'from '}
-                                <Link href={`/account/${item.counterparty}`}>
-                                  {item.counterparty?.substring(0, 4)}..{item.counterparty?.slice(-4)}
-                                </Link>
                               </>
                             )}
                           </p>

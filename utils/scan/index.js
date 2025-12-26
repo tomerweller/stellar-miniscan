@@ -245,14 +245,13 @@ async function getLatestLedger() {
 /**
  * Get recent transfers for an address (any token)
  * Fetches SEP-41 transfer events without contract filtering
- * Supports both 4-topic events (transfer, from, to, amount) and 3-topic events (transfer, from, to)
+ * Uses separate queries for sent/received to avoid RPC processing limits
  * @param {string} address - Address to fetch transfers for
- * @param {number} limit - Maximum transfers to return (default 1000)
+ * @param {number} limit - Maximum transfers to return (default 200)
  * @returns {Promise<Array>} Array of parsed transfers
  */
-export async function getRecentTransfers(address, limit = 1000) {
+export async function getRecentTransfers(address, limit = 200) {
   try {
-    // Create filter for transfer events where address is sender or receiver
     const transferSymbol = StellarSdk.nativeToScVal('transfer', { type: 'symbol' });
     const targetScVal = StellarSdk.nativeToScVal(StellarSdk.Address.fromString(address), {
       type: 'address',
@@ -260,30 +259,36 @@ export async function getRecentTransfers(address, limit = 1000) {
 
     const startLedger = await getLatestLedger();
 
-    // Use 2 filters in a single call - filters are ORed together
-    // Use ** for 4th topic to match both 3-topic and 4-topic events
-    const result = await rpcCall('getEvents', {
-      startLedger: startLedger,
-      filters: [
-        // transfers FROM the address (3 or 4 topics)
-        {
+    // Split into separate queries to avoid RPC processing limit errors
+    const [sentResult, receivedResult] = await Promise.all([
+      // transfers FROM the address
+      rpcCall('getEvents', {
+        startLedger: startLedger,
+        filters: [{
           type: 'contract',
           topics: [[transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**']],
-        },
-        // transfers TO the address (3 or 4 topics)
-        {
+        }],
+        pagination: { limit: limit, order: 'desc' }
+      }),
+      // transfers TO the address
+      rpcCall('getEvents', {
+        startLedger: startLedger,
+        filters: [{
           type: 'contract',
           topics: [[transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-        }
-      ],
-      pagination: {
-        limit: limit,
-        order: 'desc'
-      }
-    });
+        }],
+        pagination: { limit: limit, order: 'desc' }
+      })
+    ]);
 
-    const events = result.events || [];
-    return events.map(event => parseTransferEvent(event, address));
+    const sentEvents = (sentResult.events || []).map(e => parseTransferEvent(e, address));
+    const receivedEvents = (receivedResult.events || []).map(e => parseTransferEvent(e, address));
+
+    // Merge and sort by ledger descending
+    const combined = [...sentEvents, ...receivedEvents];
+    combined.sort((a, b) => b.ledger - a.ledger);
+
+    return combined.slice(0, limit);
   } catch (error) {
     console.error('Error fetching transfer history:', error);
     throw error;
@@ -327,6 +332,8 @@ export async function getFeeEvents(address, limit = 1000) {
     const startLedger = await getLatestLedger();
 
     // Query for fee events (refunds are indicated by negative amounts)
+    // Topics: [Symbol("fee"), Address(source_account)]
+    // Format: [[topic0, topic1]] - one TopicFilter with positional matching
     const result = await rpcCall('getEvents', {
       startLedger: startLedger,
       filters: [
@@ -385,74 +392,27 @@ function parseFeeEvent(event, address) {
 }
 
 /**
- * Get unified account activity (transfers + fees) in a single query
+ * Get unified account activity (transfers + fees)
  * Combines SEP-41 transfer events and CAP-67 fee events
+ * Uses separate queries to avoid RPC processing limit errors
  * @param {string} address - Address to fetch activity for
- * @param {number} limit - Maximum events to return (default 1000)
+ * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed activity items, sorted by timestamp desc
  */
-export async function getAccountActivity(address, limit = 1000) {
+export async function getAccountActivity(address, limit = 200) {
   try {
-    const transferSymbol = StellarSdk.nativeToScVal('transfer', { type: 'symbol' });
-    const feeSymbol = StellarSdk.nativeToScVal('fee', { type: 'symbol' });
-    const targetScVal = StellarSdk.nativeToScVal(StellarSdk.Address.fromString(address), {
-      type: 'address',
-    });
+    // Fetch transfers and fees in parallel with separate queries
+    // This avoids the RPC "processing limit threshold" error from combining 3 filters
+    const [transfers, fees] = await Promise.all([
+      getRecentTransfers(address, limit),
+      getFeeEvents(address, limit),
+    ]);
 
-    // Get the native XLM contract ID for fee events
-    const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
+    // Merge and sort by ledger (descending)
+    const combined = [...transfers, ...fees];
+    combined.sort((a, b) => b.ledger - a.ledger);
 
-    const startLedger = await getLatestLedger();
-
-    // Combined query: transfers (from/to) + fee events
-    // Filters are ORed together
-    const result = await rpcCall('getEvents', {
-      startLedger: startLedger,
-      filters: [
-        // transfers FROM the address (3 or 4 topics)
-        {
-          type: 'contract',
-          topics: [[transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**']],
-        },
-        // transfers TO the address (3 or 4 topics)
-        {
-          type: 'contract',
-          topics: [[transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-        },
-        // fee events on XLM contract (CAP-67)
-        {
-          type: 'contract',
-          contractIds: [xlmContractId],
-          topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
-        }
-      ],
-      pagination: {
-        limit: limit,
-        order: 'desc'
-      }
-    });
-
-    const events = result.events || [];
-
-    // Parse each event based on its type (first topic)
-    return events.map(event => {
-      const firstTopic = event.topic?.[0];
-      if (!firstTopic) return null;
-
-      try {
-        const topicScVal = StellarSdk.xdr.ScVal.fromXDR(firstTopic, 'base64');
-        const topicSymbol = topicScVal.sym().toString();
-
-        if (topicSymbol === 'transfer') {
-          return parseTransferEvent(event, address);
-        } else if (topicSymbol === 'fee') {
-          return parseFeeEvent(event, address);
-        }
-      } catch {
-        // Ignore parsing errors
-      }
-      return null;
-    }).filter(Boolean);
+    return combined.slice(0, limit);
   } catch (error) {
     console.error('Error fetching account activity:', error);
     throw error;

@@ -237,6 +237,10 @@
   color: #ffc107;
 }
 
+.scan-page .text-secondary {
+  color: var(--text-secondary);
+}
+
 /* Events list */
 .scan-page .events-list {
   margin: 1em 0;

@@ -12,7 +12,7 @@ import {
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import { getStellarExpertUrl } from '@/utils/scan/helpers';
-import { useNetwork, ScanHeader, AddressDisplay } from '@/app/components';
+import { useNetwork, ScanHeader, AddressDisplay, AddressLink } from '@/app/components';
 import '@/app/scan.css';
 
 export default function ContractPage({ params }) {
@@ -241,29 +241,57 @@ export default function ContractPage({ params }) {
 
           {transfers.length === 0 ? (
             <p>no transfers found</p>
-          ) : (
-            <>
-              <div className="transfer-list">
-                {transfers.slice(0, visibleTransfers).map((t, index) => (
-                  <p key={`${t.txHash}-${index}`} className="transfer-item">
-                    {t.direction === 'sent' ? (
-                      <>sent {formatAmount(t.amount, t.contractId)} <Link href={`/token/${t.contractId}`}>{getSymbol(t.contractId)}</Link> to <Link href={`/account/${t.counterparty}`}>{shortenAddressSmall(t.counterparty)}</Link></>
-                    ) : (
-                      <>received {formatAmount(t.amount, t.contractId)} <Link href={`/token/${t.contractId}`}>{getSymbol(t.contractId)}</Link> from <Link href={`/account/${t.counterparty}`}>{shortenAddressSmall(t.counterparty)}</Link></>
-                    )}
-                    <br />
-                    <small>{formatTimestamp(t.timestamp)} (<Link href={`/tx/${t.txHash}`}>{t.txHash?.substring(0, 4)}</Link>)</small>
-                  </p>
-                ))}
-              </div>
+          ) : (() => {
+            // Group transfers by transaction hash
+            const txGroups = [];
+            const txMap = new Map();
+            for (const t of transfers) {
+              if (!txMap.has(t.txHash)) {
+                const group = { txHash: t.txHash, timestamp: t.timestamp, events: [] };
+                txMap.set(t.txHash, group);
+                txGroups.push(group);
+              }
+              txMap.get(t.txHash).events.push(t);
+            }
 
-              {visibleTransfers < transfers.length && (
-                <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>show more</a>
-                </p>
-              )}
-            </>
-          )}
+            return (
+              <>
+                <div className="transfer-list">
+                  {txGroups.slice(0, visibleTransfers).map((group) => (
+                    <div key={group.txHash} className="tx-group">
+                      {group.events.map((t, eventIndex) => (
+                        <p key={eventIndex} className="transfer-item">
+                          <AddressLink
+                            address={t.from}
+                            display={t.from === address ? 'this' : undefined}
+                          />
+                          {' → '}
+                          <AddressLink
+                            address={t.to}
+                            display={t.to === address ? 'this' : undefined}
+                          />
+                          {': '}
+                          {formatAmount(t.amount, t.contractId)}{' '}
+                          <Link href={`/token/${t.contractId}`}>{getSymbol(t.contractId)}</Link>
+                        </p>
+                      ))}
+                      <small>
+                        {formatTimestamp(group.timestamp)}
+                        {' '}
+                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
+                      </small>
+                    </div>
+                  ))}
+                </div>
+
+                {visibleTransfers < txGroups.length && (
+                  <p>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>show more</a>
+                  </p>
+                )}
+              </>
+            );
+          })()}
 
           <hr />
 
