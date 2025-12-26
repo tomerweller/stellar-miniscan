@@ -641,7 +641,7 @@ export default function TransactionPage({ params }) {
 
           <p>
             <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('xdrs'); }}>
-              {expandedSections.xdrs ? '[-]' : '[+]'} decoded XDRs
+              {expandedSections.xdrs ? '[-]' : '[+]'} raw data
             </a>
           </p>
 
