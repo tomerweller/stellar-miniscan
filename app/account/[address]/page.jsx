@@ -18,11 +18,13 @@ import {
   AddressDisplay,
   BalanceList,
   TransferList,
+  useNetwork,
 } from '@/app/components';
 import '@/app/scan.css';
 
 export default function AccountPage({ params }) {
   const { address } = use(params);
+  const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [tokenInfo, setTokenInfo] = useState({}); // { contractId: { symbol, decimals } }
@@ -36,10 +38,10 @@ export default function AccountPage({ params }) {
   const isValid = isValidAddress(address);
 
   useEffect(() => {
-    if (isValid) {
+    if (isValid && !networkLoading) {
       loadData();
     }
-  }, [address, isValid]);
+  }, [address, isValid, network, networkLoading]);
 
   const loadData = async () => {
     setLoading(true);

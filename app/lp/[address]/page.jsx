@@ -12,12 +12,14 @@ import {
   ScanHeader,
   AddressDisplay,
   AddressLink,
+  useNetwork,
 } from '@/app/components';
 import { formatTimestamp } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function LiquidityPoolPage({ params }) {
   const { address } = use(params);
+  const { network, isLoading: networkLoading } = useNetwork();
   const [poolData, setPoolData] = useState(null);
   const [transfers, setTransfers] = useState([]);
   const [tokenInfo, setTokenInfo] = useState({});
@@ -29,10 +31,10 @@ export default function LiquidityPoolPage({ params }) {
   const isValid = isValidAddress(address) && isPool;
 
   useEffect(() => {
-    if (isValid) {
+    if (isValid && !networkLoading) {
       loadData();
     }
-  }, [address, isValid]);
+  }, [address, isValid, network, networkLoading]);
 
   const loadData = async () => {
     setLoading(true);

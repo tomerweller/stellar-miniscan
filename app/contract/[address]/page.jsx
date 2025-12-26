@@ -11,11 +11,12 @@ import {
   extractContractIds,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import config from '@/utils/config';
+import { useNetwork, ScanHeader, AddressDisplay } from '@/app/components';
 import '@/app/scan.css';
 
 export default function ContractPage({ params }) {
   const { address } = use(params);
+  const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [invocations, setInvocations] = useState([]);
@@ -30,10 +31,10 @@ export default function ContractPage({ params }) {
   const isValid = isValidAddress(address) && isContract;
 
   useEffect(() => {
-    if (isValid) {
+    if (isValid && !networkLoading) {
       loadData();
     }
-  }, [address, isValid]);
+  }, [address, isValid, network, networkLoading]);
 
   const loadData = async () => {
     setLoading(true);

@@ -1,4 +1,6 @@
+import { Suspense } from 'react';
 import './globals.css';
+import { NetworkProvider } from './components';
 
 export const metadata = {
   title: 'Lumenitos Scan',
@@ -18,7 +20,13 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <NetworkProvider>
+            {children}
+          </NetworkProvider>
+        </Suspense>
+      </body>
     </html>
   );
 }

@@ -458,6 +458,15 @@ const SCAN_STORAGE_KEYS = {
 };
 
 /**
+ * Get the cache key for token metadata (namespaced by network)
+ * @returns {string} Cache key
+ */
+function getMetadataCacheKey() {
+  const network = config.stellar.network;
+  return `${SCAN_STORAGE_KEYS.tokenMetadataCache}_${network}`;
+}
+
+/**
  * Get cached token metadata from localStorage
  * @param {string} contractId - Token contract ID
  * @returns {object|null} Cached metadata or null
@@ -465,7 +474,8 @@ const SCAN_STORAGE_KEYS = {
 function getCachedMetadata(contractId) {
   if (typeof window === 'undefined') return null;
   try {
-    const cache = localStorage.getItem(SCAN_STORAGE_KEYS.tokenMetadataCache);
+    const cacheKey = getMetadataCacheKey();
+    const cache = localStorage.getItem(cacheKey);
     if (!cache) return null;
     const parsed = JSON.parse(cache);
     return parsed[contractId] || null;
@@ -482,13 +492,23 @@ function getCachedMetadata(contractId) {
 function setCachedMetadata(contractId, metadata) {
   if (typeof window === 'undefined') return;
   try {
-    const cache = localStorage.getItem(SCAN_STORAGE_KEYS.tokenMetadataCache);
+    const cacheKey = getMetadataCacheKey();
+    const cache = localStorage.getItem(cacheKey);
     const parsed = cache ? JSON.parse(cache) : {};
     parsed[contractId] = metadata;
-    localStorage.setItem(SCAN_STORAGE_KEYS.tokenMetadataCache, JSON.stringify(parsed));
+    localStorage.setItem(cacheKey, JSON.stringify(parsed));
   } catch {
     // Ignore cache errors
   }
+}
+
+/**
+ * Get the storage key for tracked assets (namespaced by network)
+ * @returns {string} Storage key
+ */
+function getTrackedAssetsKey() {
+  const network = config.stellar.network;
+  return `${SCAN_STORAGE_KEYS.trackedAssets}_${network}`;
 }
 
 /**
@@ -500,7 +520,8 @@ export function getTrackedAssets() {
     return [];
   }
   try {
-    const stored = localStorage.getItem(SCAN_STORAGE_KEYS.trackedAssets);
+    const key = getTrackedAssetsKey();
+    const stored = localStorage.getItem(key);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
@@ -517,10 +538,11 @@ export function addTrackedAsset(contractId, symbol, name) {
   if (typeof window === 'undefined') {
     return;
   }
+  const key = getTrackedAssetsKey();
   const assets = getTrackedAssets();
   if (!assets.find(a => a.contractId === contractId)) {
     assets.push({ contractId, symbol, name });
-    localStorage.setItem(SCAN_STORAGE_KEYS.trackedAssets, JSON.stringify(assets));
+    localStorage.setItem(key, JSON.stringify(assets));
   }
 }
 
@@ -532,8 +554,9 @@ export function removeTrackedAsset(contractId) {
   if (typeof window === 'undefined') {
     return;
   }
+  const key = getTrackedAssetsKey();
   const assets = getTrackedAssets().filter(a => a.contractId !== contractId);
-  localStorage.setItem(SCAN_STORAGE_KEYS.trackedAssets, JSON.stringify(assets));
+  localStorage.setItem(key, JSON.stringify(assets));
 }
 
 /**

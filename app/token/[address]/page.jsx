@@ -12,12 +12,14 @@ import {
   ScanHeader,
   AddressDisplay,
   AddressLink,
+  useNetwork,
 } from '@/app/components';
 import { formatTimestamp } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function TokenPage({ params }) {
   const { address } = use(params);
+  const { network, isLoading: networkLoading } = useNetwork();
   const [metadata, setMetadata] = useState(null);
   const [transfers, setTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,10 +30,10 @@ export default function TokenPage({ params }) {
   const isValid = isValidAddress(address) && isContract;
 
   useEffect(() => {
-    if (isValid) {
+    if (isValid && !networkLoading) {
       loadData();
     }
-  }, [address, isValid]);
+  }, [address, isValid, network, networkLoading]);
 
   const loadData = async () => {
     setLoading(true);

@@ -12,13 +12,14 @@ import {
   extractContractIds,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { AddressLink } from './components';
+import { ScanHeader, AddressLink, useNetwork } from './components';
 import { formatTimestamp } from '@/utils/scan/helpers';
-import config from '@/utils/config';
+import { getNetworkConfig } from '@/utils/config';
 import './scan.css';
 
 export default function ScanPage() {
   const router = useRouter();
+  const { network, isLoading: networkLoading } = useNetwork();
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
   const [activity, setActivity] = useState([]);
@@ -27,8 +28,10 @@ export default function ScanPage() {
   const [activityError, setActivityError] = useState(null);
 
   useEffect(() => {
-    loadRecentActivity();
-  }, []);
+    if (!networkLoading) {
+      loadRecentActivity();
+    }
+  }, [network, networkLoading]);
 
   const loadRecentActivity = async () => {
     setLoading(true);
@@ -124,7 +127,8 @@ export default function ScanPage() {
       try {
         // Compute SAC contract address
         const asset = new StellarSdk.Asset(assetCode, issuer);
-        const contractId = asset.contractId(config.networkPassphrase);
+        const networkConfig = getNetworkConfig(network);
+        const contractId = asset.contractId(networkConfig.passphrase);
         router.push(`/token/${contractId}`);
         return;
       } catch (err) {
@@ -151,11 +155,7 @@ export default function ScanPage() {
 
   return (
     <div className="scan-page">
-      <h1>LUMENITOS SCAN</h1>
-      <p className={`network-label ${config.isTestnet ? 'testnet' : 'mainnet'}`}>
-        {config.isTestnet ? config.stellar.network : 'MAINNET'}
-      </p>
-      <p className="subtitle">mini token explorer</p>
+      <ScanHeader />
 
       <hr />
 

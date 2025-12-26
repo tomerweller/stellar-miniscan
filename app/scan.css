@@ -28,6 +28,36 @@
   background-color: #dc3545;
 }
 
+.scan-page .network-label.clickable {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.scan-page .network-label.clickable:hover {
+  opacity: 0.8;
+}
+
+/* Network selector */
+.scan-page .network-selector {
+  display: inline-block;
+}
+
+.scan-page .network-modal {
+  max-width: 300px;
+}
+
+.scan-page .network-options {
+  margin: 1em 0;
+}
+
+.scan-page .network-options p {
+  margin: 0.5em 0;
+}
+
+.scan-page .network-options a.selected {
+  font-weight: bold;
+}
+
 .scan-page .subtitle {
   color: var(--text-secondary);
   font-size: 0.9em;

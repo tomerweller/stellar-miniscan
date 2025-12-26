@@ -6,7 +6,7 @@ import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolSha
 import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import { getAddressPath } from '@/utils/scan/helpers';
-import config from '@/utils/config';
+import { ScanHeader, useNetwork } from '@/app/components';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
@@ -14,6 +14,7 @@ import '@/app/scan.css';
 
 export default function TransactionPage({ params }) {
   const { txId } = use(params);
+  const { network, isLoading: networkLoading } = useNetwork();
   const [txData, setTxData] = useState(null);
   const [decodedXdrs, setDecodedXdrs] = useState({});
   const [operations, setOperations] = useState([]);
@@ -32,10 +33,10 @@ export default function TransactionPage({ params }) {
   }, []);
 
   useEffect(() => {
-    if (txId) {
+    if (txId && !networkLoading) {
       loadTransaction();
     }
-  }, [txId]);
+  }, [txId, network, networkLoading]);
 
   useEffect(() => {
     if (xdrReady && txData) {
