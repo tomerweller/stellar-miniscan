@@ -134,7 +134,7 @@ export const formatTopicValue = (value) => {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') {
     // If it looks like an address, shorten it
-    if (value.startsWith('G') || value.startsWith('C')) {
+    if (value.startsWith('G') || value.startsWith('C') || value.startsWith('L')) {
       return shortenAddressSmall(value);
     }
     return value;
@@ -143,6 +143,10 @@ export const formatTopicValue = (value) => {
     return value.toString();
   }
   if (typeof value === 'object') {
+    // For objects with 'amount' key, just show the amount
+    if (value.amount !== undefined) {
+      return value.amount.toString();
+    }
     // Use replacer to handle BigInt inside objects
     return JSON.stringify(value, (_, v) => typeof v === 'bigint' ? v.toString() : v);
   }

@@ -127,8 +127,13 @@ export default function ContractPage({ params }) {
   };
 
   const renderTopicLink = (value) => {
-    if (typeof value === 'string' && (value.startsWith('G') || value.startsWith('C'))) {
-      return <Link href={`/account/${value}`}>{shortenAddressSmall(value)}</Link>;
+    if (typeof value === 'string') {
+      if (value.startsWith('G') || value.startsWith('C')) {
+        return <Link href={`/account/${value}`}>{shortenAddressSmall(value)}</Link>;
+      }
+      if (value.startsWith('L')) {
+        return <Link href={`/lp/${value}`}>{shortenAddressSmall(value)}</Link>;
+      }
     }
     return formatTopicValue(value);
   };
