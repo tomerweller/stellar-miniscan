@@ -26,6 +26,7 @@ export default function ScanPage() {
   const [tokenInfo, setTokenInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [activityError, setActivityError] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   useEffect(() => {
     if (!networkLoading) {
@@ -33,12 +34,14 @@ export default function ScanPage() {
     }
   }, [network, networkLoading]);
 
+  const resetVisibleCount = () => setVisibleCount(10);
+
   const loadRecentActivity = async () => {
     setLoading(true);
     setActivityError(null);
 
     try {
-      const transfers = await getRecentTokenActivity(20);
+      const transfers = await getRecentTokenActivity(200);
       setActivity(transfers);
 
       // Extract unique contract IDs and fetch metadata
@@ -78,12 +81,13 @@ export default function ScanPage() {
     }
   };
 
-  const formatTransfer = (t) => {
-    const info = tokenInfo[t.contractId];
+  // Format transfer for display
+  const formatTransfer = (item) => {
+    const info = tokenInfo[item.contractId];
     const decimals = info?.decimals ?? 7;
-    const displayAmount = rawToDisplay(t.amount, decimals);
+    const displayAmount = rawToDisplay(item.amount, decimals);
     return {
-      ...t,
+      ...item,
       formattedAmount: formatTokenBalance(displayAmount, decimals),
       symbol: info?.symbol || '???',
     };
@@ -206,18 +210,18 @@ export default function ScanPage() {
         return (
           <>
             <div className="transfer-list">
-              {txGroups.map((group) => (
+              {txGroups.slice(0, visibleCount).map((group) => (
                 <div key={group.txHash} className="tx-group">
-                  {group.events.map((t, eventIndex) => {
-                    const ft = formatTransfer(t);
+                  {group.events.map((item, eventIndex) => {
+                    const formatted = formatTransfer(item);
                     return (
                       <p key={eventIndex} className="transfer-item">
-                        <AddressLink address={t.from} />
+                        <AddressLink address={item.from} />
                         {' → '}
-                        <AddressLink address={t.to} />
+                        <AddressLink address={item.to} />
                         {': '}
-                        {ft.formattedAmount}{' '}
-                        <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
+                        {formatted.formattedAmount}{' '}
+                        <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
                       </p>
                     );
                   })}
@@ -231,7 +235,13 @@ export default function ScanPage() {
             </div>
 
             <p>
-              <a href="#" onClick={(e) => { e.preventDefault(); loadRecentActivity(); }}>refresh</a>
+              {visibleCount < txGroups.length && (
+                <>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
+                  {' | '}
+                </>
+              )}
+              <a href="#" onClick={(e) => { e.preventDefault(); resetVisibleCount(); loadRecentActivity(); }}>refresh</a>
             </p>
           </>
         );

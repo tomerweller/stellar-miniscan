@@ -421,16 +421,15 @@ export async function getAccountActivity(address, limit = 200) {
 
 /**
  * Get recent token activity across all contracts (network-wide)
- * Fetches SEP-41 transfer events without filtering by contract or address
- * @param {number} limit - Maximum transfers to return (default 50)
- * @returns {Promise<Array>} Array of parsed transfers
+ * Fetches SEP-41 transfer events
+ * @param {number} limit - Maximum events to return (default 50)
+ * @returns {Promise<Array>} Array of parsed transfer events
  */
 export async function getRecentTokenActivity(limit = 50) {
   try {
     const transferSymbol = StellarSdk.nativeToScVal('transfer', { type: 'symbol' });
     const startLedger = await getLatestLedger();
 
-    // Fetch all transfer events across any contract
     const result = await rpcCall('getEvents', {
       startLedger: startLedger,
       filters: [
