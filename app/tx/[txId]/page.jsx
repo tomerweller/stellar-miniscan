@@ -11,6 +11,8 @@ import { getNetworkConfig } from '@/utils/config';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
+// CAP-67 fee event type
+const FEE_EVENT_TYPE = 'fee';
 import '@/app/scan.css';
 
 export default function TransactionPage({ params }) {
@@ -22,6 +24,7 @@ export default function TransactionPage({ params }) {
   const [events, setEvents] = useState([]);
   const [sourceAccount, setSourceAccount] = useState(null);
   const [sponsorAccount, setSponsorAccount] = useState(null); // For fee bump txs
+  const [memo, setMemo] = useState(null); // { type, value }
   const [tokenInfo, setTokenInfo] = useState({}); // { contractId: { symbol, name, decimals } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,12 +73,65 @@ export default function TransactionPage({ params }) {
     return false;
   };
 
+  // Helper to check if an event is a CAP-67 fee event
+  const isFeeEvent = (event) => {
+    if (!event.topics || event.topics.length === 0) return false;
+    const firstTopic = event.topics[0];
+    return firstTopic?.symbol === FEE_EVENT_TYPE;
+  };
+
+  // Helper to check if an event is a token event (SEP-41 or fee)
+  const isTokenEvent = (event) => {
+    return isSep41Event(event) || isFeeEvent(event);
+  };
+
   // Get the event type from topics
   const getEventType = (event) => {
     if (event.topics?.[0]?.symbol) {
       return event.topics[0].symbol;
     }
     return 'unknown';
+  };
+
+  // Parse memo from decoded envelope
+  // stellar-xdr-json uses format like: { text: "..." } or { id: "..." } etc.
+  const parseMemo = (memoObj) => {
+    if (!memoObj) return null;
+
+    // Check for memo_none (empty object or explicit none)
+    if (memoObj.none !== undefined || memoObj.memo_none !== undefined || Object.keys(memoObj).length === 0) {
+      return null;
+    }
+
+    // stellar-xdr-json format: { text: "..." }, { id: "..." }, etc.
+    if (memoObj.text !== undefined) {
+      return { type: 'text', value: memoObj.text };
+    }
+    if (memoObj.id !== undefined) {
+      return { type: 'id', value: memoObj.id.toString() };
+    }
+    if (memoObj.hash !== undefined) {
+      return { type: 'hash', value: memoObj.hash };
+    }
+    if (memoObj.return !== undefined) {
+      return { type: 'return', value: memoObj.return };
+    }
+
+    // Fallback for older memo_* format
+    if (memoObj.memo_text !== undefined) {
+      return { type: 'text', value: memoObj.memo_text };
+    }
+    if (memoObj.memo_id !== undefined) {
+      return { type: 'id', value: memoObj.memo_id.toString() };
+    }
+    if (memoObj.memo_hash !== undefined) {
+      return { type: 'hash', value: memoObj.memo_hash };
+    }
+    if (memoObj.memo_return !== undefined) {
+      return { type: 'return', value: memoObj.memo_return };
+    }
+
+    return null;
   };
 
   const decodeAllXdrs = async () => {
@@ -99,12 +155,15 @@ export default function TransactionPage({ params }) {
           const feeBump = decoded.envelope.tx_fee_bump;
           // Sponsor is the fee bump source
           setSponsorAccount(feeBump.tx?.fee_source || null);
-          // Inner tx source account - structure is inner_tx.tx.tx.source_account
+          // Inner tx source account and memo - structure is inner_tx.tx.tx
           const innerTx = feeBump.tx?.inner_tx?.tx?.tx;
           setSourceAccount(innerTx?.source_account || null);
+          setMemo(parseMemo(innerTx?.memo));
         } else if (decoded.envelope.tx) {
-          // Regular transaction (v1): envelope.tx.tx.source_account
-          setSourceAccount(decoded.envelope.tx.tx?.source_account || null);
+          // Regular transaction (v1): envelope.tx.tx
+          const tx = decoded.envelope.tx.tx;
+          setSourceAccount(tx?.source_account || null);
+          setMemo(parseMemo(tx?.memo));
           setSponsorAccount(null);
         }
       } catch (e) {
@@ -128,21 +187,38 @@ export default function TransactionPage({ params }) {
         decoded.resultMeta = await decodeXdr('TransactionMeta', txData.resultMetaXdr);
 
         // Extract events from v4 TransactionMeta
-        if (decoded.resultMeta?.v4?.operations) {
-          for (const op of decoded.resultMeta.v4.operations) {
-            if (op.events) {
-              for (const event of op.events) {
-                allEvents.push({
-                  type: event.type_,
-                  contractId: event.contract_id,
-                  topics: event.body?.v0?.topics || [],
-                  data: event.body?.v0?.data,
-                });
+        if (decoded.resultMeta?.v4) {
+          // Transaction-level events (fee events are here per CAP-67)
+          if (decoded.resultMeta.v4.events) {
+            for (const txEvent of decoded.resultMeta.v4.events) {
+              // TransactionEvent has { stage, event } structure
+              const event = txEvent.event || txEvent;
+              allEvents.push({
+                type: event.type_,
+                contractId: event.contract_id,
+                topics: event.body?.v0?.topics || [],
+                data: event.body?.v0?.data,
+                stage: txEvent.stage, // e.g., 'before_all_txs' or 'after'
+              });
+            }
+          }
+          // Operation-level events (SEP-41 token events)
+          if (decoded.resultMeta.v4.operations) {
+            for (const op of decoded.resultMeta.v4.operations) {
+              if (op.events) {
+                for (const event of op.events) {
+                  allEvents.push({
+                    type: event.type_,
+                    contractId: event.contract_id,
+                    topics: event.body?.v0?.topics || [],
+                    data: event.body?.v0?.data,
+                  });
+                }
               }
             }
           }
         }
-        // Extract events from v3 TransactionMeta (soroban_meta)
+        // Extract events from v3 TransactionMeta (soroban_meta) - fallback for older format
         else if (decoded.resultMeta?.v3?.soroban_meta?.events) {
           for (const event of decoded.resultMeta.v3.soroban_meta.events) {
             allEvents.push({
@@ -158,8 +234,8 @@ export default function TransactionPage({ params }) {
       }
     }
 
-    // Filter to only SEP-41 token events
-    const tokenEvents = allEvents.filter(isSep41Event).map(event => ({
+    // Filter to SEP-41 token events and CAP-67 fee events
+    const tokenEvents = allEvents.filter(isTokenEvent).map(event => ({
       ...event,
       eventType: getEventType(event),
     }));
@@ -318,12 +394,19 @@ export default function TransactionPage({ params }) {
           {sponsorAccount && (
             <p><strong>sponsor:</strong> <Link href={getAddressPath(sponsorAccount)}>{sponsorAccount.substring(0, 6)}...{sponsorAccount.substring(sponsorAccount.length - 4)}</Link></p>
           )}
+          {memo && (
+            <p><strong>memo ({memo.type}):</strong> {memo.value}</p>
+          )}
 
           <hr />
 
-          <h2>operations ({operations.length})</h2>
+          <p>
+            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('operations'); }}>
+              {expandedSections.operations === false ? '[+]' : '[-]'} operations ({operations.length})
+            </a>
+          </p>
 
-          {operations.length > 0 ? (
+          {expandedSections.operations !== false && operations.length > 0 && (
             <div className="operations-list">
               {operations.map((op) => {
                 // Render description with linked addresses
@@ -385,15 +468,21 @@ export default function TransactionPage({ params }) {
                 );
               })}
             </div>
-          ) : (
+          )}
+
+          {expandedSections.operations !== false && operations.length === 0 && (
             <p>{xdrReady ? 'no operations' : 'loading...'}</p>
           )}
 
           <hr />
 
-          <h2>token events ({events.length})</h2>
+          <p>
+            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('events'); }}>
+              {expandedSections.events === false ? '[+]' : '[-]'} token events ({events.length})
+            </a>
+          </p>
 
-          {events.length > 0 ? (
+          {expandedSections.events !== false && events.length > 0 && (
             <div className="events-list">
               {events.map((event, index) => {
                 const token = tokenInfo[event.contractId];
@@ -401,15 +490,37 @@ export default function TransactionPage({ params }) {
                 const decimals = token?.decimals ?? 7;
 
                 // Extract raw amount from event data
+                // stellar-xdr-json can encode data as:
+                // 1. Direct value: { i128: "1" } or { i64: "1" }
+                // 2. Map with amount field: { map: [{ key: { symbol: "amount" }, val: { i128: "1" } }] }
                 const getRawAmount = () => {
                   if (!event.data) return null;
-                  if (event.data.i128) return event.data.i128;
-                  if (event.data.u128) return event.data.u128;
-                  if (event.data.i64) return event.data.i64;
-                  if (event.data.u64) return event.data.u64;
-                  if (event.data.i32) return String(event.data.i32);
-                  if (event.data.u32) return String(event.data.u32);
-                  return null;
+
+                  // Helper to parse numeric ScVal from stellar-xdr-json format
+                  const parseNumericScVal = (val) => {
+                    if (!val) return null;
+                    // stellar-xdr-json encodes i128/u128 as string numbers
+                    if (val.i128 !== undefined) return BigInt(val.i128);
+                    if (val.u128 !== undefined) return BigInt(val.u128);
+                    if (val.i64 !== undefined) return BigInt(val.i64);
+                    if (val.u64 !== undefined) return BigInt(val.u64);
+                    if (val.i32 !== undefined) return BigInt(val.i32);
+                    if (val.u32 !== undefined) return BigInt(val.u32);
+                    return null;
+                  };
+
+                  // Check if data is a map (SEP-41 muxed transfer format)
+                  if (event.data.map && Array.isArray(event.data.map)) {
+                    for (const entry of event.data.map) {
+                      if (entry.key?.symbol === 'amount') {
+                        return parseNumericScVal(entry.val);
+                      }
+                    }
+                    return null;
+                  }
+
+                  // Direct value (non-muxed transfer)
+                  return parseNumericScVal(event.data);
                 };
 
                 const rawAmount = getRawAmount();
@@ -448,16 +559,40 @@ export default function TransactionPage({ params }) {
                   case 'set_admin':
                     fromAddr = getAddress(1); // new admin address
                     break;
+                  case 'fee':
+                    fromAddr = getAddress(1); // account paying/receiving the fee
+                    break;
                   default:
                     fromAddr = getAddress(1);
                     toAddr = getAddress(2);
                 }
+
+                // For fee events, check if it's a refund (negative amount)
+                const isRefund = event.eventType === 'fee' && rawAmount !== null && rawAmount < 0n;
+                const absAmount = rawAmount !== null && rawAmount < 0n ? -rawAmount : rawAmount;
+                const displayAmount = event.eventType === 'fee' && absAmount !== null
+                  ? formatTokenBalance(rawToDisplay(absAmount, 7), 7)
+                  : formattedAmount;
 
                 // Render human-readable event description
                 const renderEventDescription = () => {
                   const symbolLink = <Link href={`/token/${event.contractId}`}>{symbol}</Link>;
 
                   switch (event.eventType) {
+                    case 'fee':
+                      return (
+                        <p className="event-description">
+                          <span className={isRefund ? 'success' : ''}>
+                            {isRefund ? '+' : '-'}{displayAmount || '?'} XLM
+                          </span>
+                          {' '}
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            ({isRefund ? 'refund' : 'fee'})
+                          </span>
+                          {' '}
+                          {fromAddr ? <Link href={addrLink(fromAddr)}>{minify(fromAddr)}</Link> : ''}
+                        </p>
+                      );
                     case 'transfer':
                       return (
                         <p className="event-description">
@@ -518,72 +653,80 @@ export default function TransactionPage({ params }) {
                 );
               })}
             </div>
-          ) : (
+          )}
+
+          {expandedSections.events !== false && events.length === 0 && (
             <p>{xdrReady ? 'no token events' : 'loading...'}</p>
           )}
 
           <hr />
 
-          <h2>decoded XDRs</h2>
+          <p>
+            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('xdrs'); }}>
+              {expandedSections.xdrs ? '[-]' : '[+]'} decoded XDRs
+            </a>
+          </p>
 
-          {!xdrReady ? (
-            <p>loading XDR decoder...</p>
-          ) : (
-            <>
-              {/* Envelope */}
-              <div className="xdr-section">
-                <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('envelope'); }}>
-                    {expandedSections.envelope ? '[-]' : '[+]'} TransactionEnvelope
-                  </a>
-                </p>
-                {expandedSections.envelope && (
-                  <div className="xdr-content">
-                    {decodedXdrs.envelope ? (
-                      <pre className="json-viewer">{renderJson(decodedXdrs.envelope)}</pre>
-                    ) : (
-                      <p>decoding...</p>
-                    )}
-                  </div>
-                )}
-              </div>
+          {expandedSections.xdrs && (
+            !xdrReady ? (
+              <p>loading XDR decoder...</p>
+            ) : (
+              <>
+                {/* Envelope */}
+                <div className="xdr-section">
+                  <p>
+                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('envelope'); }}>
+                      {expandedSections.envelope ? '[-]' : '[+]'} TransactionEnvelope
+                    </a>
+                  </p>
+                  {expandedSections.envelope && (
+                    <div className="xdr-content">
+                      {decodedXdrs.envelope ? (
+                        <pre className="json-viewer">{renderJson(decodedXdrs.envelope)}</pre>
+                      ) : (
+                        <p>decoding...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* Result */}
-              <div className="xdr-section">
-                <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('result'); }}>
-                    {expandedSections.result ? '[-]' : '[+]'} TransactionResult
-                  </a>
-                </p>
-                {expandedSections.result && (
-                  <div className="xdr-content">
-                    {decodedXdrs.result ? (
-                      <pre className="json-viewer">{renderJson(decodedXdrs.result)}</pre>
-                    ) : (
-                      <p>decoding...</p>
-                    )}
-                  </div>
-                )}
-              </div>
+                {/* Result */}
+                <div className="xdr-section">
+                  <p>
+                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('result'); }}>
+                      {expandedSections.result ? '[-]' : '[+]'} TransactionResult
+                    </a>
+                  </p>
+                  {expandedSections.result && (
+                    <div className="xdr-content">
+                      {decodedXdrs.result ? (
+                        <pre className="json-viewer">{renderJson(decodedXdrs.result)}</pre>
+                      ) : (
+                        <p>decoding...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* ResultMeta */}
-              <div className="xdr-section">
-                <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('resultMeta'); }}>
-                    {expandedSections.resultMeta ? '[-]' : '[+]'} TransactionMeta
-                  </a>
-                </p>
-                {expandedSections.resultMeta && (
-                  <div className="xdr-content">
-                    {decodedXdrs.resultMeta ? (
-                      <pre className="json-viewer">{renderJson(decodedXdrs.resultMeta)}</pre>
-                    ) : (
-                      <p>decoding...</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </>
+                {/* ResultMeta */}
+                <div className="xdr-section">
+                  <p>
+                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('resultMeta'); }}>
+                      {expandedSections.resultMeta ? '[-]' : '[+]'} TransactionMeta
+                    </a>
+                  </p>
+                  {expandedSections.resultMeta && (
+                    <div className="xdr-content">
+                      {decodedXdrs.resultMeta ? (
+                        <pre className="json-viewer">{renderJson(decodedXdrs.resultMeta)}</pre>
+                      ) : (
+                        <p>decoding...</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )
           )}
         </>
       )}
