@@ -8,7 +8,7 @@ Lumenitos Scan is a lightweight block explorer focused on Soroban smart contract
 
 - **Address exploration** - View token balances and transfer history for any Stellar address (G.../C.../L...)
 - **Token tracking** - See recent transfers for any SEP-41 compliant token
-- **Transaction details** - Decode and inspect transaction XDRs with human-readable token events
+- **Transaction details** - Decode and inspect transaction XDRs with human-readable token events, CAP-67 fee breakdowns, and memos
 - **Liquidity pool info** - View pool reserves, fees, and share token activity
 - **Network switching** - Toggle between testnet and mainnet with URL-based state
 
@@ -32,7 +32,8 @@ lumenitos-scan/
 │       ├── AddressDisplay.jsx    # Address with copy button
 │       ├── AddressLink.jsx       # Smart address linking
 │       ├── BalanceList.jsx       # Token balance display
-│       └── TransferList.jsx      # Transfer history list
+│       ├── TransferList.jsx      # Transfer history list
+│       └── TransferItem.jsx      # Individual transfer row
 ├── utils/
 │   ├── config.js                 # Network configs + dynamic switching
 │   ├── scan/
@@ -88,7 +89,7 @@ Deployed on Vercel with automatic builds from main branch. Network selection is 
 
 ## Tech Stack
 
-- **Next.js 16** - React framework with App Router
+- **Next.js 16 / React 19** - Latest React framework with App Router
 - **Stellar SDK** - Soroban RPC client, XDR parsing
 - **stellar-xdr-json** - WASM-based XDR to JSON decoder
 - **Custom RPC** - Self-hosted Soroban RPC with `order` param support
