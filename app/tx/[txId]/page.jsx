@@ -7,6 +7,7 @@ import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import { getAddressPath } from '@/utils/scan/helpers';
 import { ScanHeader, useNetwork } from '@/app/components';
+import config from '@/utils/config';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
