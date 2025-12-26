@@ -6,8 +6,7 @@ import {
   isValidAddress,
   getTokenBalance,
   getTokenMetadata,
-  getRecentTransfers,
-  getFeeEvents,
+  getAccountActivity,
   extractContractIds,
   getTrackedAssets,
   addTrackedAsset,
@@ -19,7 +18,6 @@ import {
   ScanHeader,
   AddressDisplay,
   BalanceList,
-  TransferList,
   useNetwork,
 } from '@/app/components';
 import '@/app/scan.css';
@@ -28,8 +26,7 @@ export default function AccountPage({ params }) {
   const { address } = use(params);
   const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
-  const [transfers, setTransfers] = useState([]);
-  const [feeEvents, setFeeEvents] = useState([]);
+  const [activity, setActivity] = useState([]); // Unified transfers + fees
   const [tokenInfo, setTokenInfo] = useState({}); // { contractId: { symbol, decimals } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,7 +34,7 @@ export default function AccountPage({ params }) {
   const [newAssetAddress, setNewAssetAddress] = useState('');
   const [addingAsset, setAddingAsset] = useState(false);
   const [addAssetError, setAddAssetError] = useState('');
-  const [visibleFeeCount, setVisibleFeeCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const isValid = isValidAddress(address);
 
@@ -50,19 +47,17 @@ export default function AccountPage({ params }) {
   const loadData = async () => {
     setLoading(true);
     setError(null);
-    setVisibleFeeCount(10);
+    setVisibleCount(10);
 
     try {
-      // Step 1: Fetch transfers and fee events in parallel
-      const [transferList, feeList] = await Promise.all([
-        getRecentTransfers(address),
-        getFeeEvents(address).catch(() => []), // Fee events may fail on older networks
-      ]);
-      setTransfers(transferList);
-      setFeeEvents(feeList);
+      // Step 1: Fetch unified activity (transfers + fees in single query)
+      const activityList = await getAccountActivity(address);
+      setActivity(activityList);
 
       // Step 2: Extract unique contract IDs from transfers + manually tracked assets
-      const autoContractIds = extractContractIds(transferList);
+      // Filter to only include transfer events (not fee events)
+      const transfers = activityList.filter(a => a.type !== 'fee');
+      const autoContractIds = extractContractIds(transfers);
       const manualAssets = getTrackedAssets();
       const manualContractIds = manualAssets.map(a => a.contractId);
 
@@ -130,25 +125,27 @@ export default function AccountPage({ params }) {
     }
   };
 
-  // Format transfer for display - adds formatted amount and symbol
-  const formatTransfer = (t) => {
-    const info = tokenInfo[t.contractId];
-    const decimals = info?.decimals ?? 7;
-    const displayAmount = rawToDisplay(t.amount, decimals);
-    return {
-      ...t,
-      amount: formatTokenBalance(displayAmount, decimals),
-      symbol: info?.symbol || '???',
-    };
-  };
-
-  // Format fee event for display - XLM with 7 decimals
-  const formatFeeEvent = (f) => {
-    const displayAmount = rawToDisplay(f.amount, 7);
-    return {
-      ...f,
-      formattedAmount: formatTokenBalance(displayAmount, 7),
-    };
+  // Format activity item for display - handles both transfers and fees
+  const formatActivity = (item) => {
+    if (item.type === 'fee') {
+      // Fee event - XLM with 7 decimals
+      const displayAmount = rawToDisplay(item.amount, 7);
+      return {
+        ...item,
+        formattedAmount: formatTokenBalance(displayAmount, 7),
+        symbol: 'XLM',
+      };
+    } else {
+      // Transfer event
+      const info = tokenInfo[item.contractId];
+      const decimals = info?.decimals ?? 7;
+      const displayAmount = rawToDisplay(item.amount, decimals);
+      return {
+        ...item,
+        formattedAmount: formatTokenBalance(displayAmount, decimals),
+        symbol: info?.symbol || '???',
+      };
+    }
   };
 
   const handleAddAsset = async (e) => {
@@ -292,32 +289,41 @@ export default function AccountPage({ params }) {
 
           <hr />
 
-          <h2>transfers</h2>
+          <h2>activity</h2>
 
-          <TransferList
-            transfers={transfers}
-            formatTransfer={formatTransfer}
-            onRefresh={loadData}
-          />
-
-          {feeEvents.length > 0 && (
+          {activity.length === 0 ? (
+            <p>no activity found</p>
+          ) : (
             <>
-              <hr />
-
-              <h2>fees</h2>
-
               <div className="transfer-list">
-                {feeEvents.slice(0, visibleFeeCount).map((f, index) => {
-                  const formatted = formatFeeEvent(f);
+                {activity.slice(0, visibleCount).map((item, index) => {
+                  const formatted = formatActivity(item);
                   return (
-                    <p key={`${f.txHash}-${index}`} className="transfer-item">
-                      <span className={formatted.isRefund ? 'success' : ''}>
-                        {formatted.isRefund ? '+' : '-'}{formatted.formattedAmount} XLM
-                      </span>
-                      {' '}
-                      <span style={{ color: 'var(--text-secondary)' }}>
-                        ({formatted.isRefund ? 'refund' : 'fee'})
-                      </span>
+                    <p key={`${item.txHash}-${index}`} className="transfer-item">
+                      {item.type === 'fee' ? (
+                        // Fee event display
+                        <>
+                          <span className={formatted.isRefund ? 'success' : ''}>
+                            {formatted.isRefund ? '+' : '-'}{formatted.formattedAmount} XLM
+                          </span>
+                          {' '}
+                          <span style={{ color: 'var(--text-secondary)' }}>
+                            ({formatted.isRefund ? 'refund' : 'fee'})
+                          </span>
+                        </>
+                      ) : (
+                        // Transfer event display
+                        <>
+                          {item.direction === 'sent' ? 'sent ' : 'received '}
+                          {formatted.formattedAmount}{' '}
+                          <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
+                          {' '}
+                          {item.direction === 'sent' ? 'to ' : 'from '}
+                          <Link href={`/account/${item.counterparty}`}>
+                            {item.counterparty?.substring(0, 4)}..{item.counterparty?.slice(-4)}
+                          </Link>
+                        </>
+                      )}
                       <br />
                       <small>
                         {formatTimestamp(formatted.timestamp)}
@@ -329,10 +335,22 @@ export default function AccountPage({ params }) {
                 })}
               </div>
 
-              {visibleFeeCount < feeEvents.length && (
+              {visibleCount < activity.length && (
                 <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleFeeCount(v => v + 10); }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
                     show more
+                  </a>
+                  {' | '}
+                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>
+                    refresh
+                  </a>
+                </p>
+              )}
+
+              {visibleCount >= activity.length && (
+                <p>
+                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>
+                    refresh
                   </a>
                 </p>
               )}

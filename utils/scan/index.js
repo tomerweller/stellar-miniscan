@@ -385,6 +385,81 @@ function parseFeeEvent(event, address) {
 }
 
 /**
+ * Get unified account activity (transfers + fees) in a single query
+ * Combines SEP-41 transfer events and CAP-67 fee events
+ * @param {string} address - Address to fetch activity for
+ * @param {number} limit - Maximum events to return (default 1000)
+ * @returns {Promise<Array>} Array of parsed activity items, sorted by timestamp desc
+ */
+export async function getAccountActivity(address, limit = 1000) {
+  try {
+    const transferSymbol = StellarSdk.nativeToScVal('transfer', { type: 'symbol' });
+    const feeSymbol = StellarSdk.nativeToScVal('fee', { type: 'symbol' });
+    const targetScVal = StellarSdk.nativeToScVal(StellarSdk.Address.fromString(address), {
+      type: 'address',
+    });
+
+    // Get the native XLM contract ID for fee events
+    const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
+
+    const startLedger = await getLatestLedger();
+
+    // Combined query: transfers (from/to) + fee events
+    // Filters are ORed together
+    const result = await rpcCall('getEvents', {
+      startLedger: startLedger,
+      filters: [
+        // transfers FROM the address (3 or 4 topics)
+        {
+          type: 'contract',
+          topics: [[transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**']],
+        },
+        // transfers TO the address (3 or 4 topics)
+        {
+          type: 'contract',
+          topics: [[transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
+        },
+        // fee events on XLM contract (CAP-67)
+        {
+          type: 'contract',
+          contractIds: [xlmContractId],
+          topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
+        }
+      ],
+      pagination: {
+        limit: limit,
+        order: 'desc'
+      }
+    });
+
+    const events = result.events || [];
+
+    // Parse each event based on its type (first topic)
+    return events.map(event => {
+      const firstTopic = event.topic?.[0];
+      if (!firstTopic) return null;
+
+      try {
+        const topicScVal = StellarSdk.xdr.ScVal.fromXDR(firstTopic, 'base64');
+        const topicSymbol = topicScVal.sym().toString();
+
+        if (topicSymbol === 'transfer') {
+          return parseTransferEvent(event, address);
+        } else if (topicSymbol === 'fee') {
+          return parseFeeEvent(event, address);
+        }
+      } catch {
+        // Ignore parsing errors
+      }
+      return null;
+    }).filter(Boolean);
+  } catch (error) {
+    console.error('Error fetching account activity:', error);
+    throw error;
+  }
+}
+
+/**
  * Get recent token activity across all contracts (network-wide)
  * Fetches SEP-41 transfer events without filtering by contract or address
  * @param {number} limit - Maximum transfers to return (default 50)
