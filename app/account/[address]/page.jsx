@@ -330,15 +330,9 @@ export default function AccountPage({ params }) {
                             ) : (
                               // Transfer event display - arrow format matching main page
                               <>
-                                <AddressLink
-                                  address={item.from}
-                                  display={item.from === address ? 'you' : undefined}
-                                />
+                                <AddressLink address={item.from} />
                                 {' → '}
-                                <AddressLink
-                                  address={item.to}
-                                  display={item.to === address ? 'you' : undefined}
-                                />
+                                <AddressLink address={item.to} />
                                 {': '}
                                 {formatted.formattedAmount}{' '}
                                 <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>

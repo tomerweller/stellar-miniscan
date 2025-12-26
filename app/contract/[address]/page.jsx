@@ -261,15 +261,9 @@ export default function ContractPage({ params }) {
                     <div key={group.txHash} className="tx-group">
                       {group.events.map((t, eventIndex) => (
                         <p key={eventIndex} className="transfer-item">
-                          <AddressLink
-                            address={t.from}
-                            display={t.from === address ? 'this' : undefined}
-                          />
+                          <AddressLink address={t.from} />
                           {' → '}
-                          <AddressLink
-                            address={t.to}
-                            display={t.to === address ? 'this' : undefined}
-                          />
+                          <AddressLink address={t.to} />
                           {': '}
                           {formatAmount(t.amount, t.contractId)}{' '}
                           <Link href={`/token/${t.contractId}`}>{getSymbol(t.contractId)}</Link>

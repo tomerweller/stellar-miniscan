@@ -166,37 +166,58 @@ export default function LiquidityPoolPage({ params }) {
 
           {transfers.length === 0 ? (
             <p>no transfers found</p>
-          ) : (
-            <>
-              <div className="transfer-list">
-                {transfers.slice(0, visibleCount).map((t, index) => {
-                  const ft = formatTransfer(t);
-                  return (
-                    <p key={`${t.txHash}-${index}`} className="transfer-item">
-                      <AddressLink address={t.from} />
-                      {' -> '}
-                      <AddressLink address={t.to} />
-                      {': '}
-                      {ft.formattedAmount}{' '}
-                      <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                      <br />
-                      <small>{formatTimestamp(t.timestamp)} (<Link href={`/tx/${t.txHash}`}>{t.txHash?.substring(0, 4)}</Link>)</small>
-                    </p>
-                  );
-                })}
-              </div>
+          ) : (() => {
+            // Group transfers by transaction hash
+            const txGroups = [];
+            const txMap = new Map();
+            for (const t of transfers) {
+              if (!txMap.has(t.txHash)) {
+                const group = { txHash: t.txHash, timestamp: t.timestamp, events: [] };
+                txMap.set(t.txHash, group);
+                txGroups.push(group);
+              }
+              txMap.get(t.txHash).events.push(t);
+            }
 
-              <p>
-                {visibleCount < transfers.length && (
-                  <>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
-                    {' | '}
-                  </>
-                )}
-                <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-              </p>
-            </>
-          )}
+            return (
+              <>
+                <div className="transfer-list">
+                  {txGroups.slice(0, visibleCount).map((group) => (
+                    <div key={group.txHash} className="tx-group">
+                      {group.events.map((t, eventIndex) => {
+                        const ft = formatTransfer(t);
+                        return (
+                          <p key={eventIndex} className="transfer-item">
+                            <AddressLink address={t.from} />
+                            {' → '}
+                            <AddressLink address={t.to} />
+                            {': '}
+                            {ft.formattedAmount}{' '}
+                            <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
+                          </p>
+                        );
+                      })}
+                      <small>
+                        {formatTimestamp(group.timestamp)}
+                        {' '}
+                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
+                      </small>
+                    </div>
+                  ))}
+                </div>
+
+                <p>
+                  {visibleCount < txGroups.length && (
+                    <>
+                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
+                      {' | '}
+                    </>
+                  )}
+                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
+                </p>
+              </>
+            );
+          })()}
         </>
       )}
 
