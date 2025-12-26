@@ -162,10 +162,10 @@ export default function LiquidityPoolPage({ params }) {
 
           <hr />
 
-          <h2>recent transfers</h2>
+          <h2>recent activity</h2>
 
           {transfers.length === 0 ? (
-            <p>no transfers found</p>
+            <p>no activity found</p>
           ) : (() => {
             // Group transfers by transaction hash
             const txGroups = [];

@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolShareMetadata } from '@/utils/scan';
 import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { getAddressPath, getStellarExpertUrl } from '@/utils/scan/helpers';
-import { ScanHeader, useNetwork } from '@/app/components';
-import { getNetworkConfig } from '@/utils/config';
+import { getAddressPath, formatUnixTimestamp } from '@/utils/scan/helpers';
+import { ScanHeader, AddressDisplay, useNetwork } from '@/app/components';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
@@ -28,7 +27,6 @@ export default function TransactionPage({ params }) {
   const [tokenInfo, setTokenInfo] = useState({}); // { contractId: { symbol, name, decimals } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [expandedSections, setExpandedSections] = useState({});
   const [xdrReady, setXdrReady] = useState(false);
 
@@ -267,29 +265,11 @@ export default function TransactionPage({ params }) {
     setTokenInfo(infoMap);
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(txId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const shortenHash = (hash) => {
-    if (!hash || hash.length < 16) return hash;
-    return `${hash.substring(0, 8)}....${hash.substring(hash.length - 8)}`;
-  };
-
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
-  };
-
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    // RPC returns Unix timestamp in seconds as STRING, JS needs milliseconds
-    const seconds = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
-    return new Date(seconds * 1000).toLocaleString();
   };
 
   const getStatusColor = (status) => {
@@ -353,25 +333,13 @@ export default function TransactionPage({ params }) {
     return <span>{String(data)}</span>;
   };
 
-  // Get explorer URL for transaction
-  const txExplorerUrl = `${getNetworkConfig(network).explorerUrl}/tx/${txId}`;
-
   return (
     <div className="scan-page">
       <ScanHeader />
 
       <hr />
 
-      <p>
-        <strong>tx:</strong> {shortenHash(txId)}{' '}
-        (<a href="#" onClick={(e) => { e.preventDefault(); copyToClipboard(); }}>
-          {copied ? 'copied!' : 'copy'}
-        </a>)
-        {' | '}
-        <a href={txExplorerUrl} target="_blank" rel="noopener noreferrer">
-          stellar.expert
-        </a>
-      </p>
+      <AddressDisplay address={txId} label="tx:" type="tx" />
 
       <hr />
 
@@ -387,7 +355,7 @@ export default function TransactionPage({ params }) {
 
           <p><strong>status:</strong> <span className={getStatusColor(txData.status)}>{txData.status}</span></p>
           <p><strong>ledger:</strong> {txData.ledger || 'N/A'}</p>
-          <p><strong>timestamp:</strong> {formatTimestamp(txData.createdAt)}</p>
+          <p><strong>timestamp:</strong> {formatUnixTimestamp(txData.createdAt)}</p>
           {sourceAccount && (
             <p><strong>source:</strong> <Link href={getAddressPath(sourceAccount)}>{sourceAccount.substring(0, 6)}...{sourceAccount.substring(sourceAccount.length - 4)}</Link></p>
           )}

@@ -350,25 +350,15 @@ export default function AccountPage({ params }) {
                   ))}
                 </div>
 
-                {visibleCount < txGroups.length && (
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
-                      show more
-                    </a>
-                    {' | '}
-                    <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>
-                      refresh
-                    </a>
-                  </p>
-                )}
-
-                {visibleCount >= txGroups.length && (
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>
-                      refresh
-                    </a>
-                  </p>
-                )}
+                <p>
+                  {visibleCount < txGroups.length && (
+                    <>
+                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
+                      {' | '}
+                    </>
+                  )}
+                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
+                </p>
               </>
             );
           })()}

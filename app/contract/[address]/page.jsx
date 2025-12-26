@@ -11,7 +11,11 @@ import {
   extractContractIds,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { getStellarExpertUrl } from '@/utils/scan/helpers';
+import {
+  formatTimestamp,
+  formatTopicValue,
+  shortenAddressSmall,
+} from '@/utils/scan/helpers';
 import { useNetwork, ScanHeader, AddressDisplay, AddressLink } from '@/app/components';
 import '@/app/scan.css';
 
@@ -24,7 +28,6 @@ export default function ContractPage({ params }) {
   const [tokenInfo, setTokenInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [visibleTransfers, setVisibleTransfers] = useState(10);
   const [visibleInvocations, setVisibleInvocations] = useState(10);
 
@@ -112,22 +115,6 @@ export default function ContractPage({ params }) {
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const shortenAddress = (addr) => {
-    if (!addr || addr.length < 12) return addr;
-    return `${addr.substring(0, 6)}....${addr.substring(addr.length - 6)}`;
-  };
-
-  const shortenAddressSmall = (addr) => {
-    if (!addr || addr.length < 12) return addr;
-    return `${addr.substring(0, 4)}..${addr.substring(addr.length - 4)}`;
-  };
-
   const formatAmount = (amount, contractId) => {
     const info = tokenInfo[contractId];
     const decimals = info?.decimals ?? 7;
@@ -135,32 +122,8 @@ export default function ContractPage({ params }) {
     return formatTokenBalance(displayAmount, decimals);
   };
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';
-    return new Date(timestamp).toLocaleString();
-  };
-
   const getSymbol = (contractId) => {
     return tokenInfo[contractId]?.symbol || '???';
-  };
-
-  const formatTopicValue = (value) => {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'string') {
-      // If it looks like an address, shorten it
-      if (value.startsWith('G') || value.startsWith('C')) {
-        return shortenAddressSmall(value);
-      }
-      return value;
-    }
-    if (typeof value === 'bigint') {
-      return value.toString();
-    }
-    if (typeof value === 'object') {
-      // Use replacer to handle BigInt inside objects
-      return JSON.stringify(value, (_, v) => typeof v === 'bigint' ? v.toString() : v);
-    }
-    return String(value);
   };
 
   const renderTopicLink = (value) => {
@@ -196,20 +159,10 @@ export default function ContractPage({ params }) {
 
       <hr />
 
-      <p>
-        <strong>contract:</strong>{' '}
-        {shortenAddress(address)}{' '}
-        (<a href="#" onClick={(e) => { e.preventDefault(); copyToClipboard(); }}>
-          {copied ? 'copied!' : 'copy'}
-        </a>)
-        {' | '}
-        <a href={getStellarExpertUrl(address, network)} target="_blank" rel="noopener noreferrer">
-          stellar.expert
-        </a>
-      </p>
+      <AddressDisplay address={address} label="contract:" />
 
       <p>
-        <Link href={`/token/${address}`}>token view</Link>
+        <Link href={`/token/${address}`}>switch to token view</Link>
       </p>
 
       <hr />
@@ -237,10 +190,10 @@ export default function ContractPage({ params }) {
 
           <hr />
 
-          <h2>token transfers</h2>
+          <h2>recent activity</h2>
 
           {transfers.length === 0 ? (
-            <p>no transfers found</p>
+            <p>no activity found</p>
           ) : (() => {
             // Group transfers by transaction hash
             const txGroups = [];
@@ -278,11 +231,15 @@ export default function ContractPage({ params }) {
                   ))}
                 </div>
 
-                {visibleTransfers < txGroups.length && (
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>show more</a>
-                  </p>
-                )}
+                <p>
+                  {visibleTransfers < txGroups.length && (
+                    <>
+                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>show more</a>
+                      {' | '}
+                    </>
+                  )}
+                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
+                </p>
               </>
             );
           })()}
@@ -323,17 +280,17 @@ export default function ContractPage({ params }) {
                 ))}
               </div>
 
-              {visibleInvocations < invocations.length && (
-                <p>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleInvocations(v => v + 10); }}>show more</a>
-                </p>
-              )}
+              <p>
+                {visibleInvocations < invocations.length && (
+                  <>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleInvocations(v => v + 10); }}>show more</a>
+                    {' | '}
+                  </>
+                )}
+                <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
+              </p>
             </>
           )}
-
-          <p>
-            <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-          </p>
         </>
       )}
 
