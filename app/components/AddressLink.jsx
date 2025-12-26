@@ -11,6 +11,7 @@ import {
  * - G... addresses -> /account/
  * - C... addresses -> /contract/
  * - L... addresses -> /lp/ (liquidity pools)
+ * - B... addresses -> not linked (claimable balance IDs)
  *
  * @param {Object} props
  * @param {string} props.address - The full address
@@ -22,7 +23,12 @@ export default function AddressLink({ address, display, short = true }) {
 
   const displayText = display || (short ? shortenAddressSmall(address) : address);
 
-  // All address types use internal Next.js Link routing
+  // B... addresses are claimable balance IDs, not linkable accounts
+  if (address.startsWith('B')) {
+    return <span className="text-secondary">{displayText} (balance)</span>;
+  }
+
+  // All other address types use internal Next.js Link routing
   return (
     <Link href={getAddressPath(address)}>
       {displayText}
