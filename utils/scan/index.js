@@ -449,7 +449,7 @@ export async function getRecentTransfers(address, limit = 200) {
 
     const startLedger = await getLatestLedger();
 
-    // Single query with 5 filters for all token activity involving this address:
+    // Single filter with 5 topic patterns for all token activity (OR logic):
     // - transfer: [symbol, from, to, asset?] - match from OR to
     // - mint: [symbol, admin, to, asset?] - match to (recipient)
     // - burn: [symbol, from, asset?] - match from
@@ -457,30 +457,15 @@ export async function getRecentTransfers(address, limit = 200) {
     const result = await rpcCall('getEvents', {
       startLedger: startLedger,
       filters: [
-        // transfers FROM the address
         {
           type: 'contract',
-          topics: [[transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**']],
-        },
-        // transfers TO the address
-        {
-          type: 'contract',
-          topics: [[transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-        },
-        // mint TO the address (topic[2] = recipient)
-        {
-          type: 'contract',
-          topics: [[mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-        },
-        // burn FROM the address (topic[1] = from)
-        {
-          type: 'contract',
-          topics: [[burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**']],
-        },
-        // clawback FROM the address (topic[2] = from)
-        {
-          type: 'contract',
-          topics: [[clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
+          topics: [
+            [transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**'],  // transfers FROM
+            [transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // transfers TO
+            [mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],      // mint TO
+            [burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**'],           // burn FROM
+            [clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // clawback FROM
+          ],
         },
       ],
       pagination: { limit: limit * 5, order: 'desc' }
@@ -608,7 +593,7 @@ function parseFeeEvent(event, address) {
 
 /**
  * Get unified account activity (transfers, mint, burn, clawback + fees)
- * Uses two RPC queries (max 5 filters each) and merges results
+ * Uses a single RPC query with 2 filters (token events + fee events)
  * @param {string} address - Address to fetch activity for
  * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed activity items, sorted by timestamp desc
@@ -627,58 +612,34 @@ export async function getAccountActivity(address, limit = 200) {
 
     const startLedger = await getLatestLedger();
 
-    // RPC allows max 5 filters per request, so we split into two queries:
-    // Query 1: Token events (5 filters)
-    // Query 2: Fee events (1 filter)
-    const [tokenResult, feeResult] = await Promise.all([
-      // Token events query (5 filters)
-      rpcCall('getEvents', {
-        startLedger: startLedger,
-        filters: [
-          // transfers FROM the address
-          {
-            type: 'contract',
-            topics: [[transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**']],
-          },
-          // transfers TO the address
-          {
-            type: 'contract',
-            topics: [[transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-          },
-          // mint TO the address (topic[2] = recipient)
-          {
-            type: 'contract',
-            topics: [[mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-          },
-          // burn FROM the address (topic[1] = from)
-          {
-            type: 'contract',
-            topics: [[burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**']],
-          },
-          // clawback FROM the address (topic[2] = from)
-          {
-            type: 'contract',
-            topics: [[clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**']],
-          },
-        ],
-        pagination: { limit: limit * 5, order: 'desc' }
-      }),
-      // Fee events query (1 filter)
-      rpcCall('getEvents', {
-        startLedger: startLedger,
-        filters: [
-          {
-            type: 'contract',
-            contractIds: [xlmContractId],
-            topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
-          },
-        ],
-        pagination: { limit: limit, order: 'desc' }
-      }),
-    ]);
+    // Single query with 2 filters:
+    // - Filter 1: Token events (5 topic patterns for transfer/mint/burn/clawback)
+    // - Filter 2: Fee events (needs contractIds, so separate filter)
+    const result = await rpcCall('getEvents', {
+      startLedger: startLedger,
+      filters: [
+        // Token events: 5 topic patterns in 1 filter (OR logic)
+        {
+          type: 'contract',
+          topics: [
+            [transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**'],  // transfers FROM
+            [transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // transfers TO
+            [mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],      // mint TO
+            [burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**'],           // burn FROM
+            [clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // clawback FROM
+          ],
+        },
+        // Fee events (separate filter because it needs contractIds)
+        {
+          type: 'contract',
+          contractIds: [xlmContractId],
+          topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
+        },
+      ],
+      pagination: { limit: limit * 6, order: 'desc' }
+    });
 
-    // Combine events from both queries
-    const allEvents = [...(tokenResult.events || []), ...(feeResult.events || [])];
+    const allEvents = result.events || [];
 
     // Parse each event based on first topic, dedupe by event ID
     const uniqueById = new Map();
@@ -745,15 +706,21 @@ export async function getRecentTokenActivity(limit = 50) {
     return activity.slice(0, limit);
   };
 
-  // Try combined query first (may hit RPC limits on busy networks)
+  // Single filter with 4 topic patterns for all event types (OR logic)
+  // May hit RPC limits on busy networks, falls back to transfers only
   try {
     const result = await rpcCall('getEvents', {
       startLedger: startLedger,
       filters: [
-        { type: 'contract', topics: [[transferSymbol.toXDR('base64'), '*', '*', '**']] },
-        { type: 'contract', topics: [[mintSymbol.toXDR('base64'), '*', '*', '**']] },
-        { type: 'contract', topics: [[burnSymbol.toXDR('base64'), '*', '**']] },
-        { type: 'contract', topics: [[clawbackSymbol.toXDR('base64'), '*', '*', '**']] },
+        {
+          type: 'contract',
+          topics: [
+            [transferSymbol.toXDR('base64'), '*', '*', '**'],
+            [mintSymbol.toXDR('base64'), '*', '*', '**'],
+            [burnSymbol.toXDR('base64'), '*', '**'],
+            [clawbackSymbol.toXDR('base64'), '*', '*', '**'],
+          ],
+        },
       ],
       pagination: { limit: limit * 4, order: 'desc' }
     });
@@ -796,33 +763,19 @@ export async function getTokenTransfers(tokenContractId, limit = 1000) {
     const clawbackSymbol = StellarSdk.nativeToScVal('clawback', { type: 'symbol' });
     const startLedger = await getLatestLedger();
 
-    // Single query with 4 filters for all token activity from this contract
+    // Single filter with contractIds and 4 topic patterns (OR logic)
     const result = await rpcCall('getEvents', {
       startLedger: startLedger,
       filters: [
-        // transfers
         {
           type: 'contract',
           contractIds: [tokenContractId],
-          topics: [[transferSymbol.toXDR('base64'), '*', '*', '**']],
-        },
-        // mints
-        {
-          type: 'contract',
-          contractIds: [tokenContractId],
-          topics: [[mintSymbol.toXDR('base64'), '*', '*', '**']],
-        },
-        // burns
-        {
-          type: 'contract',
-          contractIds: [tokenContractId],
-          topics: [[burnSymbol.toXDR('base64'), '*', '**']],
-        },
-        // clawbacks
-        {
-          type: 'contract',
-          contractIds: [tokenContractId],
-          topics: [[clawbackSymbol.toXDR('base64'), '*', '*', '**']],
+          topics: [
+            [transferSymbol.toXDR('base64'), '*', '*', '**'],    // transfers
+            [mintSymbol.toXDR('base64'), '*', '*', '**'],        // mints
+            [burnSymbol.toXDR('base64'), '*', '**'],             // burns
+            [clawbackSymbol.toXDR('base64'), '*', '*', '**'],    // clawbacks
+          ],
         },
       ],
       pagination: {

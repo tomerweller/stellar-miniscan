@@ -90,9 +90,10 @@ The explorer uses Stellar's `getEvents` RPC method to query CAP-67 compliant tok
 Events are validated to ensure topic positions contain proper address ScVals. Non-conforming events (e.g., tokens with custom event formats) are filtered out.
 
 **RPC Query Strategy:**
-- Account activity uses 2 parallel queries (max 5 filters per request)
-- Token activity queries by contract ID with 4 event type filters
-- Network-wide activity falls back to transfers-only if combined query hits processing limits
+- Uses single filters with multiple topic patterns (OR logic) for efficiency
+- Account activity: 2 filters (token events with 5 topic patterns + fee events)
+- Token activity: 1 filter with 4 topic patterns and contractIds
+- Network-wide activity falls back to transfers-only if query hits processing limits
 
 ### Metadata Caching
 
