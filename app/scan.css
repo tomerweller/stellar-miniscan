@@ -30,6 +30,17 @@
   opacity: 0.8;
 }
 
+.beta-badge {
+  font-size: 0.45em;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border: 1px solid var(--text-secondary);
+  border-radius: 4px;
+  padding: 2px 5px;
+  vertical-align: middle;
+  text-transform: lowercase;
+}
+
 .scan-header-left .subtitle {
   color: var(--text-secondary);
   font-size: 0.75em;
