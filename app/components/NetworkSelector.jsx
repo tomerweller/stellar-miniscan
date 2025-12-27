@@ -1,21 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNetwork } from './NetworkContext';
 
 /**
  * Network selector dropdown
- * Shows current network as a clickable label, opens popup to switch networks
+ * Shows current network as a colored badge, opens dropdown to switch networks
  */
 export default function NetworkSelector() {
   const { network, setNetwork, isLoading } = useNetwork();
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen]);
 
   if (isLoading) {
     return (
-      <p className="network-label testnet">
-        loading...
-      </p>
+      <div className="network-dropdown">
+        <button className="network-dropdown-trigger testnet">
+          ...
+        </button>
+      </div>
     );
   }
 
@@ -25,50 +53,40 @@ export default function NetworkSelector() {
   };
 
   const networkClass = network === 'mainnet' ? 'mainnet' : 'testnet';
-  const networkLabel = network === 'mainnet' ? 'MAINNET' : 'TESTNET';
+  const networkLabel = network === 'mainnet' ? 'mainnet' : 'testnet';
 
   return (
-    <div className="network-selector">
-      <p
-        className={`network-label ${networkClass} clickable`}
-        onClick={() => setIsOpen(true)}
-        title="Click to change network"
+    <div className="network-dropdown" ref={dropdownRef}>
+      <button
+        className={`network-dropdown-trigger ${networkClass}`}
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
         {networkLabel}
-      </p>
+        <span className="arrow">▼</span>
+      </button>
 
       {isOpen && (
-        <div className="modal-overlay" onClick={() => setIsOpen(false)}>
-          <div className="modal network-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>select network</h3>
-
-            <div className="network-options">
-              <p>
-                <a
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); handleSelect('testnet'); }}
-                  className={network === 'testnet' ? 'selected' : ''}
-                >
-                  TESTNET
-                </a>
-                {network === 'testnet' && ' (current)'}
-              </p>
-              <p>
-                <a
-                  href="#"
-                  onClick={(e) => { e.preventDefault(); handleSelect('mainnet'); }}
-                  className={network === 'mainnet' ? 'selected' : ''}
-                >
-                  MAINNET
-                </a>
-                {network === 'mainnet' && ' (current)'}
-              </p>
-            </div>
-
-            <p>
-              <a href="#" onClick={(e) => { e.preventDefault(); setIsOpen(false); }}>cancel</a>
-            </p>
-          </div>
+        <div className="network-dropdown-menu" role="listbox">
+          <button
+            className={`network-dropdown-item ${network === 'testnet' ? 'selected' : ''}`}
+            onClick={() => handleSelect('testnet')}
+            role="option"
+            aria-selected={network === 'testnet'}
+          >
+            <span className="radio" />
+            testnet
+          </button>
+          <button
+            className={`network-dropdown-item ${network === 'mainnet' ? 'selected' : ''}`}
+            onClick={() => handleSelect('mainnet')}
+            role="option"
+            aria-selected={network === 'mainnet'}
+          >
+            <span className="radio" />
+            mainnet
+          </button>
         </div>
       )}
     </div>

@@ -13,11 +13,11 @@ import {
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import {
-  formatTimestamp,
+  formatRelativeTime,
   formatTopicValue,
   shortenAddressSmall,
 } from '@/utils/scan/helpers';
-import { useNetwork, ScanHeader, AddressDisplay, AddressLink } from '@/app/components';
+import { useNetwork, ScanHeader, AddressDisplay, AddressLink, SkeletonActivity, SkeletonBalance } from '@/app/components';
 import '@/app/scan.css';
 
 export default function ContractPage({ params }) {
@@ -169,19 +169,25 @@ export default function ContractPage({ params }) {
     return formatTopicValue(value);
   };
 
+  // Get event type display info
+  const getEventTypeInfo = (type) => {
+    switch (type) {
+      case 'mint': return { label: 'Mint', dotClass: 'success' };
+      case 'burn': return { label: 'Burn', dotClass: 'danger' };
+      case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+      default: return { label: 'Transfer', dotClass: '' };
+    }
+  };
+
   if (!isValid) {
     return (
       <div className="scan-page">
         <ScanHeader />
-
-        <hr />
-
         <p className="error">
           {!address?.startsWith('C')
             ? 'Contract view requires a contract address (C...)'
             : `Invalid contract address: ${address}`}
         </p>
-
         <p>
           <Link href="/">back to search</Link>
         </p>
@@ -193,40 +199,56 @@ export default function ContractPage({ params }) {
     <div className="scan-page page-contract">
       <ScanHeader />
 
-      <hr />
+      <AddressDisplay address={address} label="Contract" />
 
-      <AddressDisplay address={address} label="contract:" />
-
-      <p>
-        <Link href={`/token/${address}`}>switch to token view</Link>
+      <p style={{ marginTop: '8px' }}>
+        <Link href={`/token/${address}`}>switch to token view →</Link>
       </p>
 
-      <hr />
-
       {loading ? (
-        <p>loading...</p>
+        <>
+          <div className="section-title">Balances</div>
+          <div className="balance-list">
+            <SkeletonBalance count={2} />
+          </div>
+          <div className="section-title">Recent Activity</div>
+          <SkeletonActivity count={3} />
+          <div className="section-title">Recent Invocations</div>
+          <SkeletonActivity count={3} />
+        </>
       ) : error ? (
         <p className="error">error: {error}</p>
       ) : (
         <>
-          <h2>balances</h2>
+          <div className="section-title">Balances</div>
 
           {balances.length === 0 ? (
             <p>no token balances found</p>
           ) : (
-            balances.map((b) => (
-              <p key={b.contractId} className="balance-row">
-                <span className="balance-amount">
-                  {b.balance}{' '}
-                  <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
-                </span>
-              </p>
-            ))
+            <div className="balance-list">
+              {balances.map((b) => (
+                <div key={b.contractId} className="balance-card">
+                  <div className="balance-card-header">
+                    <span className="balance-symbol">
+                      <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
+                    </span>
+                  </div>
+                  <div className="balance-amount">{b.balance}</div>
+                </div>
+              ))}
+            </div>
           )}
 
-          <hr />
-
-          <h2>recent activity</h2>
+          <div className="section-title">
+            Recent Activity
+            <a
+              href="#"
+              className="refresh-btn"
+              onClick={(e) => { e.preventDefault(); setVisibleTransfers(10); loadData(); }}
+            >
+              refresh ↻
+            </a>
+          </div>
 
           {transfers.length === 0 ? (
             <p>no activity found</p>
@@ -245,126 +267,143 @@ export default function ContractPage({ params }) {
 
             return (
               <>
-                <div className="transfer-list">
+                <div className="card">
                   {txGroups.slice(0, visibleTransfers).map((group) => (
-                    <div key={group.txHash} className="tx-group">
-                      {group.events.map((t, eventIndex) => (
-                        <p key={eventIndex} className="transfer-item">
-                          {t.type === 'mint' ? (
-                            <>
-                              <span className="success">+{formatAmount(t.amount, t.contractId)}</span>{' '}
-                              <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
-                              {' → '}
-                              <AddressLink address={t.to} />
-                              {' '}
-                              <span className="text-secondary">(minted)</span>
-                            </>
-                          ) : t.type === 'burn' ? (
-                            <>
-                              <AddressLink address={t.from} />
-                              {': '}
-                              <span>-{formatAmount(t.amount, t.contractId)}</span>{' '}
-                              <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
-                              {' '}
-                              <span className="text-secondary">(burned)</span>
-                            </>
-                          ) : t.type === 'clawback' ? (
-                            <>
-                              <AddressLink address={t.from} />
-                              {': '}
-                              <span className="error">-{formatAmount(t.amount, t.contractId)}</span>{' '}
-                              <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
-                              {' '}
-                              <span className="text-secondary">(clawback)</span>
-                            </>
-                          ) : (
-                            <>
-                              <AddressLink address={t.from} />
-                              {' → '}
-                              <AddressLink address={t.to} />
-                              {': '}
-                              {formatAmount(t.amount, t.contractId)}{' '}
-                              <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
-                            </>
-                          )}
-                        </p>
-                      ))}
-                      <small>
-                        {formatTimestamp(group.timestamp)}
-                        {' '}
-                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
-                      </small>
+                    <div key={group.txHash} className="card-item">
+                      {group.events.map((t, eventIndex) => {
+                        const typeInfo = getEventTypeInfo(t.type);
+
+                        return (
+                          <div key={eventIndex} style={{ marginBottom: eventIndex < group.events.length - 1 ? '12px' : '0' }}>
+                            <div className="activity-card-header">
+                              <div className="event-type">
+                                <span className={`event-dot ${typeInfo.dotClass}`} />
+                                {typeInfo.label}
+                              </div>
+                              {eventIndex === 0 && (
+                                <span className="activity-timestamp" title={new Date(group.timestamp).toLocaleString()}>
+                                  {formatRelativeTime(group.timestamp)}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="activity-addresses">
+                              {t.type === 'mint' ? (
+                                <>→ <AddressLink address={t.to} /></>
+                              ) : t.type === 'burn' || t.type === 'clawback' ? (
+                                <AddressLink address={t.from} />
+                              ) : (
+                                <>
+                                  <AddressLink address={t.from} />
+                                  {' → '}
+                                  <AddressLink address={t.to} />
+                                </>
+                              )}
+                            </div>
+
+                            <div className="activity-footer">
+                              <span className={`activity-amount ${
+                                t.type === 'mint' ? 'positive' :
+                                t.type === 'clawback' || t.type === 'burn' ? 'negative' : ''
+                              }`}>
+                                {t.type === 'mint' && '+'}
+                                {(t.type === 'burn' || t.type === 'clawback') && '-'}
+                                {formatAmount(t.amount, t.contractId)}{' '}
+                                <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
+                              </span>
+                              {eventIndex === group.events.length - 1 && (
+                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                  tx:{group.txHash?.substring(0, 4)}
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
 
-                <p>
-                  {visibleTransfers < txGroups.length && (
-                    <>
-                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>show more</a>
-                      {' | '}
-                    </>
-                  )}
-                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-                </p>
+                {visibleTransfers < txGroups.length && (
+                  <p style={{ textAlign: 'center' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleTransfers(v => v + 10); }}>
+                      show more
+                    </a>
+                  </p>
+                )}
               </>
             );
           })()}
 
-          <hr />
-
-          <h2>recent invocations</h2>
+          <div className="section-title">
+            Recent Invocations
+            <a
+              href="#"
+              className="refresh-btn"
+              onClick={(e) => { e.preventDefault(); setVisibleInvocations(10); loadData(); }}
+            >
+              refresh ↻
+            </a>
+          </div>
 
           {invocations.length === 0 ? (
             <p>no invocations found</p>
           ) : (
             <>
-              <div className="invocation-list">
+              <div className="card">
                 {invocations.slice(0, visibleInvocations).map((inv, index) => (
-                  <p key={`${inv.txHash}-${index}`} className="invocation-item">
-                    <strong>{inv.eventType}</strong>
+                  <div key={`${inv.txHash}-${index}`} className="card-item">
+                    <div className="activity-card-header">
+                      <div className="event-type">
+                        <span className={`event-dot ${inv.inSuccessfulContractCall ? '' : 'danger'}`} />
+                        {inv.eventType}
+                      </div>
+                      <span className="activity-timestamp" title={new Date(inv.timestamp).toLocaleString()}>
+                        {formatRelativeTime(inv.timestamp)}
+                      </span>
+                    </div>
+
                     {inv.topics.length > 0 && (
-                      <>
-                        {' ('}
+                      <div className="activity-addresses">
                         {inv.topics.map((topic, i) => (
                           <span key={i}>
                             {i > 0 && ', '}
                             {renderTopicLink(topic)}
                           </span>
                         ))}
-                        {')'}
-                      </>
+                      </div>
                     )}
-                    {inv.value !== null && (
-                      <> = {formatTopicValue(inv.value)}</>
+
+                    <div className="activity-footer">
+                      {inv.value !== null && (
+                        <span className="text-secondary">= {formatTopicValue(inv.value)}</span>
+                      )}
+                      <Link href={`/tx/${inv.txHash}`} className="activity-tx-link">
+                        tx:{inv.txHash?.substring(0, 4)}
+                      </Link>
+                    </div>
+
+                    {!inv.inSuccessfulContractCall && (
+                      <span className="error" style={{ fontSize: '12px' }}>[failed]</span>
                     )}
-                    <br />
-                    <small>
-                      {formatTimestamp(inv.timestamp)} (<Link href={`/tx/${inv.txHash}`}>{inv.txHash?.substring(0, 4)}</Link>)
-                      {!inv.inSuccessfulContractCall && <span className="error"> [failed]</span>}
-                    </small>
-                  </p>
+                  </div>
                 ))}
               </div>
 
-              <p>
-                {visibleInvocations < invocations.length && (
-                  <>
-                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleInvocations(v => v + 10); }}>show more</a>
-                    {' | '}
-                  </>
-                )}
-                <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-              </p>
+              {visibleInvocations < invocations.length && (
+                <p style={{ textAlign: 'center' }}>
+                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleInvocations(v => v + 10); }}>
+                    show more
+                  </a>
+                </p>
+              )}
             </>
           )}
         </>
       )}
 
-      <hr />
-
-      <p>
-        <Link href="/">new search</Link>
+      <p style={{ marginTop: '24px' }}>
+        <Link href="/">← new search</Link>
       </p>
     </div>
   );

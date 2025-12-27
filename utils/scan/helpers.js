@@ -52,6 +52,46 @@ export const formatUnixTimestamp = (timestamp) => {
 };
 
 /**
+ * Format a timestamp as relative time (e.g., "5 sec ago", "2 min ago")
+ * Falls back to time-only for timestamps older than 24 hours
+ * @param {string|number} timestamp - ISO string or Unix timestamp
+ * @returns {string} Relative time string
+ */
+export const formatRelativeTime = (timestamp) => {
+  if (!timestamp) return '';
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+
+  if (diffSec < 60) {
+    return `${diffSec} sec ago`;
+  }
+  if (diffMin < 60) {
+    return `${diffMin} min ago`;
+  }
+  if (diffHour < 24) {
+    return `${diffHour} hr ago`;
+  }
+
+  // For older timestamps, show time only
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/**
+ * Format time only (no date) from timestamp
+ * @param {string|number} timestamp - ISO string or Unix timestamp
+ * @returns {string} Time string (e.g., "3:38 PM")
+ */
+export const formatTimeOnly = (timestamp) => {
+  if (!timestamp) return '';
+  return new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+/**
  * Get the internal route path for an address based on its type
  * G... -> /account/, C... -> /contract/, L... -> /lp/
  * @param {string} addr - The address

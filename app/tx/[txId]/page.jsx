@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolShareMetadata, cacheSacMetadata } from '@/utils/scan';
 import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { getAddressPath, formatUnixTimestamp } from '@/utils/scan/helpers';
-import { ScanHeader, AddressDisplay, useNetwork } from '@/app/components';
+import { getAddressPath, formatUnixTimestamp, shortenAddress } from '@/utils/scan/helpers';
+import { ScanHeader, AddressDisplay, useNetwork, SkeletonText, SkeletonCard } from '@/app/components';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
@@ -363,45 +363,89 @@ export default function TransactionPage({ params }) {
     <div className="scan-page page-tx">
       <ScanHeader />
 
-      <hr />
-
-      <AddressDisplay address={txId} label="tx:" type="tx" />
-
-      <hr />
+      <AddressDisplay address={txId} label="Transaction" type="tx" />
 
       {loading ? (
-        <p>loading...</p>
+        <>
+          <div className="section-title">Transaction Info</div>
+          <div className="tx-meta">
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Status</span>
+              <SkeletonText width="80px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Ledger</span>
+              <SkeletonText width="100px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Timestamp</span>
+              <SkeletonText width="150px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Source</span>
+              <SkeletonText width="120px" />
+            </div>
+          </div>
+          <div className="section-title">Operations</div>
+          <SkeletonCard />
+          <div className="section-title">Token Events</div>
+          <SkeletonCard />
+        </>
       ) : error ? (
         <p className="error">error: {error}</p>
       ) : !txData ? (
         <p>transaction not found</p>
       ) : (
         <>
-          <h2>transaction info</h2>
+          <div className="section-title">Transaction Info</div>
 
-          <p><strong>status:</strong> <span className={getStatusColor(txData.status)}>{txData.status}</span></p>
-          <p><strong>ledger:</strong> {txData.ledger || 'N/A'}</p>
-          <p><strong>timestamp:</strong> {formatUnixTimestamp(txData.createdAt)}</p>
-          {sourceAccount && (
-            <p><strong>source:</strong> <Link href={getAddressPath(sourceAccount)}>{sourceAccount.substring(0, 6)}...{sourceAccount.substring(sourceAccount.length - 4)}</Link></p>
-          )}
-          {sponsorAccount && (
-            <p><strong>sponsor:</strong> <Link href={getAddressPath(sponsorAccount)}>{sponsorAccount.substring(0, 6)}...{sponsorAccount.substring(sponsorAccount.length - 4)}</Link></p>
-          )}
-          {memo && (
-            <p><strong>memo ({memo.type}):</strong> {memo.value}</p>
-          )}
+          <div className="tx-meta">
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Status</span>
+              <span className={`tx-meta-value ${getStatusColor(txData.status)}`}>{txData.status}</span>
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Ledger</span>
+              <span className="tx-meta-value">{txData.ledger || 'N/A'}</span>
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Timestamp</span>
+              <span className="tx-meta-value">{formatUnixTimestamp(txData.createdAt)}</span>
+            </div>
+            {sourceAccount && (
+              <div className="tx-meta-item">
+                <span className="tx-meta-label">Source</span>
+                <span className="tx-meta-value">
+                  <Link href={getAddressPath(sourceAccount)}>{shortenAddress(sourceAccount)}</Link>
+                </span>
+              </div>
+            )}
+            {sponsorAccount && (
+              <div className="tx-meta-item">
+                <span className="tx-meta-label">Sponsor</span>
+                <span className="tx-meta-value">
+                  <Link href={getAddressPath(sponsorAccount)}>{shortenAddress(sponsorAccount)}</Link>
+                </span>
+              </div>
+            )}
+            {memo && (
+              <div className="tx-meta-item tx-meta-full">
+                <span className="tx-meta-label">Memo ({memo.type})</span>
+                <span className="tx-meta-value">{memo.value}</span>
+              </div>
+            )}
+          </div>
 
-          <hr />
-
-          <p>
-            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('operations'); }}>
-              {expandedSections.operations === false ? '[+]' : '[-]'} operations ({operations.length})
-            </a>
-          </p>
+          <div
+            className="collapsible-header"
+            onClick={() => toggleSection('operations')}
+          >
+            <span className="collapsible-icon">{expandedSections.operations === false ? '+' : '−'}</span>
+            <span>Operations ({operations.length})</span>
+          </div>
 
           {expandedSections.operations !== false && operations.length > 0 && (
-            <div className="operations-list">
+            <div className="card" style={{ marginTop: '8px' }}>
               {operations.map((op) => {
                 // Render description with linked addresses
                 const renderOpDescription = () => {
@@ -452,32 +496,33 @@ export default function TransactionPage({ params }) {
                 };
 
                 return (
-                  <p key={op.index} className="operation-item">
+                  <div key={op.index} className="card-item">
                     <span className="op-index">{op.index + 1}.</span>{' '}
                     {renderOpDescription()}
                     {op.sourceAccount && (
-                      <span className="op-source"> (source: <Link href={getAddressPath(op.sourceAccount)}>{op.sourceAccountShort}</Link>)</span>
+                      <span className="text-secondary"> (source: <Link href={getAddressPath(op.sourceAccount)}>{op.sourceAccountShort}</Link>)</span>
                     )}
-                  </p>
+                  </div>
                 );
               })}
             </div>
           )}
 
           {expandedSections.operations !== false && operations.length === 0 && (
-            <p>{xdrReady ? 'no operations' : 'loading...'}</p>
+            <p style={{ marginTop: '8px' }} className="text-secondary">{xdrReady ? 'no operations' : 'loading...'}</p>
           )}
 
-          <hr />
-
-          <p>
-            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('events'); }}>
-              {expandedSections.events === false ? '[+]' : '[-]'} token events ({events.length})
-            </a>
-          </p>
+          <div
+            className="collapsible-header"
+            onClick={() => toggleSection('events')}
+            style={{ marginTop: '16px' }}
+          >
+            <span className="collapsible-icon">{expandedSections.events === false ? '+' : '−'}</span>
+            <span>Token Events ({events.length})</span>
+          </div>
 
           {expandedSections.events !== false && events.length > 0 && (
-            <div className="events-list">
+            <div className="card" style={{ marginTop: '8px' }}>
               {events.map((event, index) => {
                 const token = tokenInfo[event.contractId];
                 const symbol = token?.symbol === 'native' ? 'XLM' : (token?.symbol || '???');
@@ -650,7 +695,7 @@ export default function TransactionPage({ params }) {
                 };
 
                 return (
-                  <div key={index} className="event-item">
+                  <div key={index} className="card-item">
                     {renderEventDescription()}
                   </div>
                 );
@@ -659,85 +704,90 @@ export default function TransactionPage({ params }) {
           )}
 
           {expandedSections.events !== false && events.length === 0 && (
-            <p>{xdrReady ? 'no token events' : 'loading...'}</p>
+            <p style={{ marginTop: '8px' }} className="text-secondary">{xdrReady ? 'no token events' : 'loading...'}</p>
           )}
 
-          <hr />
-
-          <p>
-            <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('xdrs'); }}>
-              {expandedSections.xdrs ? '[-]' : '[+]'} raw data
-            </a>
-          </p>
+          <div
+            className="collapsible-header"
+            onClick={() => toggleSection('xdrs')}
+            style={{ marginTop: '16px' }}
+          >
+            <span className="collapsible-icon">{expandedSections.xdrs ? '−' : '+'}</span>
+            <span>Raw Data</span>
+          </div>
 
           {expandedSections.xdrs && (
             !xdrReady ? (
-              <p>loading XDR decoder...</p>
+              <p style={{ marginTop: '8px' }} className="text-secondary">loading XDR decoder...</p>
             ) : (
-              <>
+              <div className="card" style={{ marginTop: '8px' }}>
                 {/* Envelope */}
-                <div className="xdr-section">
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('envelope'); }}>
-                      {expandedSections.envelope ? '[-]' : '[+]'} TransactionEnvelope
-                    </a>
-                  </p>
+                <div className="card-item">
+                  <div
+                    className="collapsible-header nested"
+                    onClick={() => toggleSection('envelope')}
+                  >
+                    <span className="collapsible-icon">{expandedSections.envelope ? '−' : '+'}</span>
+                    <span>TransactionEnvelope</span>
+                  </div>
                   {expandedSections.envelope && (
                     <div className="xdr-content">
                       {decodedXdrs.envelope ? (
                         <pre className="json-viewer">{renderJson(decodedXdrs.envelope)}</pre>
                       ) : (
-                        <p>decoding...</p>
+                        <p className="text-secondary">decoding...</p>
                       )}
                     </div>
                   )}
                 </div>
 
                 {/* Result */}
-                <div className="xdr-section">
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('result'); }}>
-                      {expandedSections.result ? '[-]' : '[+]'} TransactionResult
-                    </a>
-                  </p>
+                <div className="card-item">
+                  <div
+                    className="collapsible-header nested"
+                    onClick={() => toggleSection('result')}
+                  >
+                    <span className="collapsible-icon">{expandedSections.result ? '−' : '+'}</span>
+                    <span>TransactionResult</span>
+                  </div>
                   {expandedSections.result && (
                     <div className="xdr-content">
                       {decodedXdrs.result ? (
                         <pre className="json-viewer">{renderJson(decodedXdrs.result)}</pre>
                       ) : (
-                        <p>decoding...</p>
+                        <p className="text-secondary">decoding...</p>
                       )}
                     </div>
                   )}
                 </div>
 
                 {/* ResultMeta */}
-                <div className="xdr-section">
-                  <p>
-                    <a href="#" onClick={(e) => { e.preventDefault(); toggleSection('resultMeta'); }}>
-                      {expandedSections.resultMeta ? '[-]' : '[+]'} TransactionMeta
-                    </a>
-                  </p>
+                <div className="card-item">
+                  <div
+                    className="collapsible-header nested"
+                    onClick={() => toggleSection('resultMeta')}
+                  >
+                    <span className="collapsible-icon">{expandedSections.resultMeta ? '−' : '+'}</span>
+                    <span>TransactionMeta</span>
+                  </div>
                   {expandedSections.resultMeta && (
                     <div className="xdr-content">
                       {decodedXdrs.resultMeta ? (
                         <pre className="json-viewer">{renderJson(decodedXdrs.resultMeta)}</pre>
                       ) : (
-                        <p>decoding...</p>
+                        <p className="text-secondary">decoding...</p>
                       )}
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )
           )}
         </>
       )}
 
-      <hr />
-
-      <p>
-        <Link href="/">new search</Link>
+      <p style={{ marginTop: '24px' }}>
+        <Link href="/">← new search</Link>
       </p>
     </div>
   );

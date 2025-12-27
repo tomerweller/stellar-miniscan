@@ -17,13 +17,15 @@ import {
   cacheSacMetadata,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { formatTimestamp } from '@/utils/scan/helpers';
+import { formatRelativeTime } from '@/utils/scan/helpers';
 import {
   ScanHeader,
   AddressDisplay,
   AddressLink,
   BalanceList,
   useNetwork,
+  SkeletonActivity,
+  SkeletonBalance,
 } from '@/app/components';
 import '@/app/scan.css';
 
@@ -293,11 +295,43 @@ export default function AccountPage({ params }) {
     setBalances(prev => prev.filter(b => b.contractId !== contractId));
   };
 
+  // Get direction for transfer relative to current account
+  const getDirection = (item) => {
+    if (item.type === 'fee') {
+      return item.isRefund ? 'in' : 'out';
+    }
+    if (item.type === 'mint') {
+      return item.to === address ? 'in' : null;
+    }
+    if (item.type === 'burn' || item.type === 'clawback') {
+      return item.from === address ? 'out' : null;
+    }
+    // transfer
+    if (item.from === address) return 'out';
+    if (item.to === address) return 'in';
+    return null;
+  };
+
+  // Get event type display info
+  const getEventTypeInfo = (item) => {
+    const direction = getDirection(item);
+    switch (item.type) {
+      case 'fee':
+        return { label: item.isRefund ? 'Refund' : 'Fee', dotClass: item.isRefund ? 'success' : '' };
+      case 'mint': return { label: 'Mint', dotClass: 'success' };
+      case 'burn': return { label: 'Burn', dotClass: 'danger' };
+      case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+      default:
+        return direction === 'in'
+          ? { label: 'Received', dotClass: 'success' }
+          : { label: 'Sent', dotClass: '' };
+    }
+  };
+
   if (!isValid) {
     return (
       <div className="scan-page">
         <ScanHeader />
-        <hr />
         <p className="error">Invalid address: {address}</p>
         <p>
           <Link href="/">back to search</Link>
@@ -309,32 +343,36 @@ export default function AccountPage({ params }) {
   return (
     <div className="scan-page page-account">
       <ScanHeader />
-      <hr />
 
-      <AddressDisplay address={address} label="account:" />
+      <AddressDisplay address={address} label="Account" />
 
       {address.startsWith('C') && (
-        <p>
-          <Link href={`/token/${address}`}>switch to token view</Link>
+        <p style={{ marginTop: '8px' }}>
+          <Link href={`/token/${address}`}>switch to token view →</Link>
         </p>
       )}
 
-      <hr />
-
       {loading ? (
-        <p>loading...</p>
+        <>
+          <div className="section-title">Balances</div>
+          <div className="balance-list">
+            <SkeletonBalance count={3} />
+          </div>
+          <div className="section-title">Token Activity</div>
+          <SkeletonActivity count={5} />
+        </>
       ) : error ? (
         <p className="error">error: {error}</p>
       ) : (
         <>
-          <h2>balances</h2>
+          <div className="section-title">Balances</div>
 
           <BalanceList
             balances={balances}
             onRemove={handleRemoveAsset}
           />
 
-          <p>
+          <p style={{ marginTop: '12px' }}>
             <a href="#" onClick={(e) => { e.preventDefault(); setShowAddAsset(true); }}>+ add asset</a>
           </p>
 
@@ -372,9 +410,16 @@ export default function AccountPage({ params }) {
             </div>
           )}
 
-          <hr />
-
-          <h2>token activity</h2>
+          <div className="section-title">
+            Token Activity
+            <a
+              href="#"
+              className="refresh-btn"
+              onClick={(e) => { e.preventDefault(); setVisibleCount(10); loadData(); }}
+            >
+              refresh ↻
+            </a>
+          </div>
 
           {activityError ? (
             <p className="error">{activityError}</p>
@@ -395,90 +440,97 @@ export default function AccountPage({ params }) {
 
             return (
               <>
-                <div className="transfer-list">
+                <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="tx-group">
+                    <div key={group.txHash} className="card-item">
                       {group.events.map((item, eventIndex) => {
                         const formatted = formatActivity(item);
+                        const typeInfo = getEventTypeInfo(item);
+                        const direction = getDirection(item);
+
                         return (
-                          <p key={eventIndex} className="transfer-item">
-                            {item.type === 'fee' ? (
-                              // Fee event display
-                              <>
-                                <span className={formatted.isRefund ? 'success' : ''}>
-                                  {formatted.isRefund ? '+' : '-'}{formatted.formattedAmount} XLM
+                          <div key={eventIndex} style={{ marginBottom: eventIndex < group.events.length - 1 ? '12px' : '0' }}>
+                            <div className="activity-card-header">
+                              <div className="event-type">
+                                <span className={`event-dot ${typeInfo.dotClass}`} />
+                                {typeInfo.label}
+                                {direction && (
+                                  <span className={`direction-badge ${direction}`}>
+                                    {direction === 'in' ? '↓' : '↑'}
+                                  </span>
+                                )}
+                              </div>
+                              {eventIndex === 0 && (
+                                <span className="activity-timestamp" title={new Date(group.timestamp).toLocaleString()}>
+                                  {formatRelativeTime(group.timestamp)}
                                 </span>
-                                {' '}
-                                <span className="text-secondary">
-                                  ({formatted.isRefund ? 'refund' : 'fee'})
-                                </span>
-                              </>
-                            ) : item.type === 'mint' ? (
-                              // Mint event display
-                              <>
-                                <span className="success">+{formatted.formattedAmount}</span>{' '}
-                                <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                                {' '}
-                                <span className="text-secondary">(minted)</span>
-                              </>
-                            ) : item.type === 'burn' ? (
-                              // Burn event display
-                              <>
-                                <span>-{formatted.formattedAmount}</span>{' '}
-                                <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                                {' '}
-                                <span className="text-secondary">(burned)</span>
-                              </>
-                            ) : item.type === 'clawback' ? (
-                              // Clawback event display
-                              <>
-                                <span className="error">-{formatted.formattedAmount}</span>{' '}
-                                <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                                {' '}
-                                <span className="text-secondary">(clawback by <AddressLink address={item.to} />)</span>
-                              </>
-                            ) : (
-                              // Transfer event display - arrow format matching main page
-                              <>
+                              )}
+                            </div>
+
+                            <div className="activity-addresses">
+                              {item.type === 'fee' ? (
+                                <span className="text-secondary">transaction fee</span>
+                              ) : item.type === 'mint' ? (
+                                <>→ <AddressLink address={item.to} /></>
+                              ) : item.type === 'burn' ? (
                                 <AddressLink address={item.from} />
-                                {' → '}
-                                <AddressLink address={item.to} />
-                                {': '}
+                              ) : item.type === 'clawback' ? (
+                                <>
+                                  <AddressLink address={item.from} />
+                                  <span className="text-secondary"> (by <AddressLink address={item.to} />)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AddressLink address={item.from} />
+                                  {' → '}
+                                  <AddressLink address={item.to} />
+                                </>
+                              )}
+                            </div>
+
+                            <div className="activity-footer">
+                              <span className={`activity-amount ${
+                                item.type === 'mint' || (item.type === 'fee' && item.isRefund) ? 'positive' :
+                                item.type === 'clawback' || item.type === 'burn' || (item.type === 'fee' && !item.isRefund) ? 'negative' :
+                                direction === 'in' ? 'positive' : direction === 'out' ? 'negative' : ''
+                              }`}>
+                                {(item.type === 'mint' || (item.type === 'fee' && item.isRefund) || direction === 'in') && '+'}
+                                {(item.type === 'burn' || item.type === 'clawback' || (item.type === 'fee' && !item.isRefund) || direction === 'out') && '-'}
                                 {formatted.formattedAmount}{' '}
-                                <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                              </>
-                            )}
-                          </p>
+                                {item.type === 'fee' ? (
+                                  <span>XLM</span>
+                                ) : (
+                                  <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
+                                )}
+                              </span>
+                              {eventIndex === group.events.length - 1 && (
+                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                  tx:{group.txHash?.substring(0, 4)}
+                                </Link>
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
-                      <small>
-                        {formatTimestamp(group.timestamp)}
-                        {' '}
-                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
-                      </small>
                     </div>
                   ))}
                 </div>
 
-                <p>
-                  {visibleCount < txGroups.length && (
-                    <>
-                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
-                      {' | '}
-                    </>
-                  )}
-                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-                </p>
+                {visibleCount < txGroups.length && (
+                  <p style={{ textAlign: 'center' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
+                      show more
+                    </a>
+                  </p>
+                )}
               </>
             );
           })()}
         </>
       )}
 
-      <hr />
-
-      <p>
-        <Link href="/">new search</Link>
+      <p style={{ marginTop: '24px' }}>
+        <Link href="/">← new search</Link>
       </p>
     </div>
   );

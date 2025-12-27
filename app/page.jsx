@@ -12,8 +12,8 @@ import {
   extractContractIds,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { ScanHeader, AddressLink, useNetwork } from './components';
-import { formatTimestamp } from '@/utils/scan/helpers';
+import { ScanHeader, AddressLink, useNetwork, SkeletonActivity } from './components';
+import { formatRelativeTime } from '@/utils/scan/helpers';
 import { getNetworkConfig } from '@/utils/config';
 import './scan.css';
 
@@ -158,123 +158,136 @@ export default function ScanPage() {
     }
   };
 
+  // Get event type display info
+  const getEventTypeInfo = (type) => {
+    switch (type) {
+      case 'mint': return { label: 'Mint', dotClass: 'success' };
+      case 'burn': return { label: 'Burn', dotClass: 'danger' };
+      case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+      default: return { label: 'Transfer', dotClass: '' };
+    }
+  };
+
+  // Group transfers by transaction hash
+  const groupByTransaction = (items) => {
+    const txGroups = [];
+    const txMap = new Map();
+    for (const item of items) {
+      if (!txMap.has(item.txHash)) {
+        const group = { txHash: item.txHash, timestamp: item.timestamp, events: [] };
+        txMap.set(item.txHash, group);
+        txGroups.push(group);
+      }
+      txMap.get(item.txHash).events.push(item);
+    }
+    return txGroups;
+  };
+
   return (
     <div className="scan-page">
       <ScanHeader />
 
-      <hr />
-
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="address">enter address</label>
+        <div className="search-box">
+          <span className="search-icon">🔍</span>
           <input
             type="text"
-            id="address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="G... / C... / L... / tx hash / ASSET:ISSUER"
+            placeholder="Search address, tx hash, or ASSET:ISSUER..."
             autoComplete="off"
             spellCheck="false"
           />
         </div>
 
         {error && <p className="error">{error}</p>}
-
-        <p>
-          <a href="#" onClick={handleSubmit}>explore</a>
-        </p>
       </form>
 
-      <hr />
-
-      <h2>recent activity</h2>
+      <div className="section-title">
+        Recent Network Activity
+        <a
+          href="#"
+          className="refresh-btn"
+          onClick={(e) => { e.preventDefault(); resetVisibleCount(); loadRecentActivity(); }}
+        >
+          refresh ↻
+        </a>
+      </div>
 
       {loading ? (
-        <p>loading...</p>
+        <SkeletonActivity count={5} />
       ) : activityError ? (
-        <p className="error">error: {activityError}</p>
+        <p className="error">Error: {activityError}</p>
       ) : activity.length === 0 ? (
-        <p>no recent activity</p>
+        <p>No recent activity</p>
       ) : (() => {
-        // Group transfers by transaction hash
-        const txGroups = [];
-        const txMap = new Map();
-        for (const item of activity) {
-          if (!txMap.has(item.txHash)) {
-            const group = { txHash: item.txHash, timestamp: item.timestamp, events: [] };
-            txMap.set(item.txHash, group);
-            txGroups.push(group);
-          }
-          txMap.get(item.txHash).events.push(item);
-        }
+        const txGroups = groupByTransaction(activity);
 
         return (
           <>
-            <div className="transfer-list">
+            <div className="card">
               {txGroups.slice(0, visibleCount).map((group) => (
-                <div key={group.txHash} className="tx-group">
+                <div key={group.txHash} className="card-item">
                   {group.events.map((item, eventIndex) => {
                     const formatted = formatTransfer(item);
+                    const typeInfo = getEventTypeInfo(item.type);
+
                     return (
-                      <p key={eventIndex} className="transfer-item">
-                        {item.type === 'mint' ? (
-                          <>
-                            <span className="success">+{formatted.formattedAmount}</span>{' '}
-                            <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                            {' → '}
-                            <AddressLink address={item.to} />
-                            {' '}
-                            <span className="text-secondary">(minted)</span>
-                          </>
-                        ) : item.type === 'burn' ? (
-                          <>
+                      <div key={eventIndex} style={{ marginBottom: eventIndex < group.events.length - 1 ? '12px' : '0' }}>
+                        <div className="activity-card-header">
+                          <div className="event-type">
+                            <span className={`event-dot ${typeInfo.dotClass}`} />
+                            {typeInfo.label}
+                          </div>
+                          {eventIndex === 0 && (
+                            <span className="activity-timestamp" title={new Date(group.timestamp).toLocaleString()}>
+                              {formatRelativeTime(group.timestamp)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="activity-addresses">
+                          {item.type === 'mint' ? (
+                            <>→ <AddressLink address={item.to} /></>
+                          ) : item.type === 'burn' ? (
                             <AddressLink address={item.from} />
-                            {': '}
-                            <span>-{formatted.formattedAmount}</span>{' '}
-                            <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                            {' '}
-                            <span className="text-secondary">(burned)</span>
-                          </>
-                        ) : item.type === 'clawback' ? (
-                          <>
-                            <AddressLink address={item.from} />
-                            {': '}
-                            <span className="error">-{formatted.formattedAmount}</span>{' '}
-                            <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                            {' '}
-                            <span className="text-secondary">(clawback)</span>
-                          </>
-                        ) : (
-                          <>
-                            <AddressLink address={item.from} />
-                            {' → '}
-                            <AddressLink address={item.to} />
-                            {': '}
+                          ) : (
+                            <>
+                              <AddressLink address={item.from} />
+                              {' → '}
+                              <AddressLink address={item.to} />
+                            </>
+                          )}
+                        </div>
+
+                        <div className="activity-footer">
+                          <span className={`activity-amount ${item.type === 'mint' ? 'positive' : item.type === 'clawback' ? 'negative' : ''}`}>
+                            {item.type === 'mint' && '+'}
+                            {item.type === 'burn' && '-'}
+                            {item.type === 'clawback' && '-'}
                             {formatted.formattedAmount}{' '}
                             <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
-                          </>
-                        )}
-                      </p>
+                          </span>
+                          {eventIndex === group.events.length - 1 && (
+                            <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                              tx:{group.txHash?.substring(0, 4)}
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-                  <small>
-                    {formatTimestamp(group.timestamp)}
-                    {' '}
-                    (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
-                  </small>
                 </div>
               ))}
             </div>
 
-            <p>
-              {visibleCount < txGroups.length && (
-                <>
-                  <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
-                  {' | '}
-                </>
-              )}
-              <a href="#" onClick={(e) => { e.preventDefault(); resetVisibleCount(); loadRecentActivity(); }}>refresh</a>
-            </p>
+            {visibleCount < txGroups.length && (
+              <p style={{ textAlign: 'center' }}>
+                <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
+                  show more
+                </a>
+              </p>
+            )}
           </>
         );
       })()}

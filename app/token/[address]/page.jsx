@@ -14,8 +14,10 @@ import {
   AddressDisplay,
   AddressLink,
   useNetwork,
+  SkeletonActivity,
+  SkeletonText,
 } from '@/app/components';
-import { formatTimestamp } from '@/utils/scan/helpers';
+import { formatRelativeTime } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function TokenPage({ params }) {
@@ -92,11 +94,53 @@ export default function TokenPage({ params }) {
     return metadata.symbol === 'native' ? 'XLM' : metadata.symbol;
   };
 
+  // Parse SAC token name to extract issuer info
+  // SAC names are in format "CODE:ISSUER_ADDRESS" or "native"
+  const parseTokenName = () => {
+    if (!metadata?.name) return { displayName: null, issuer: null };
+
+    const name = metadata.name;
+    const symbol = metadata.symbol;
+
+    // Native XLM
+    if (name === 'native' || symbol === 'native') {
+      return { displayName: 'Stellar Native Asset', issuer: null };
+    }
+
+    // SAC format: CODE:ISSUER (e.g., "USDC:GA5ZSEJYB37...")
+    if (name.includes(':')) {
+      const [code, issuer] = name.split(':');
+      if (issuer && issuer.startsWith('G') && issuer.length >= 56) {
+        // Don't show displayName if it matches the symbol
+        const showName = code !== symbol ? code : null;
+        return { displayName: showName, issuer };
+      }
+    }
+
+    // Regular token name - show if different from symbol
+    if (name !== symbol) {
+      // Truncate if too long
+      const displayName = name.length > 40 ? name.substring(0, 40) + '...' : name;
+      return { displayName, issuer: null };
+    }
+
+    return { displayName: null, issuer: null };
+  };
+
+  // Get event type display info
+  const getEventTypeInfo = (type) => {
+    switch (type) {
+      case 'mint': return { label: 'Mint', dotClass: 'success' };
+      case 'burn': return { label: 'Burn', dotClass: 'danger' };
+      case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+      default: return { label: 'Transfer', dotClass: '' };
+    }
+  };
+
   if (!isValid) {
     return (
       <div className="scan-page">
         <ScanHeader />
-        <hr />
         <p className="error">
           {!address?.startsWith('C')
             ? 'Token view requires a contract address (C...)'
@@ -112,33 +156,65 @@ export default function TokenPage({ params }) {
   return (
     <div className="scan-page page-token">
       <ScanHeader />
-      <hr />
-
-      <AddressDisplay address={address} label="token:" />
-
-      <p>
-        <Link href={`/contract/${address}`}>switch to contract view</Link>
-      </p>
-
-      <hr />
 
       {loading ? (
-        <p>loading...</p>
+        <>
+          <div className="token-hero">
+            <div className="token-hero-main">
+              <SkeletonText width="80px" />
+              <SkeletonText width="150px" />
+            </div>
+            <div className="token-hero-meta">
+              <SkeletonText width="100px" />
+            </div>
+          </div>
+          <AddressDisplay address={address} label="Contract" />
+          <div className="section-title">Recent Activity</div>
+          <SkeletonActivity count={5} />
+        </>
       ) : error ? (
-        <p className="error">
-          {error.includes('not found') ? 'token contract not found' : `error: ${error}`}
-        </p>
+        <>
+          <AddressDisplay address={address} label="Token" />
+          <p className="error">
+            {error.includes('not found') ? 'token contract not found' : `error: ${error}`}
+          </p>
+        </>
       ) : (
         <>
-          <h2>token info</h2>
+          {(() => {
+            const { displayName, issuer } = parseTokenName();
+            return (
+              <div className="token-hero">
+                <div className="token-symbol">{getSymbol()}</div>
+                {displayName && <div className="token-name">{displayName}</div>}
+                {issuer && (
+                  <div className="token-issuer">
+                    Issued by <Link href={`/account/${issuer}`}>{issuer.substring(0, 4)}...{issuer.substring(issuer.length - 4)}</Link>
+                  </div>
+                )}
+                <div className="token-hero-meta">
+                  <span className="token-decimals">{metadata?.decimals ?? 7} decimals</span>
+                </div>
+              </div>
+            );
+          })()}
 
-          <p><strong>symbol:</strong> {getSymbol()}</p>
-          <p><strong>name:</strong> {metadata?.name || 'Unknown'}</p>
-          <p><strong>decimals:</strong> {metadata?.decimals ?? 7}</p>
+          <AddressDisplay address={address} label="Contract" />
 
-          <hr />
+          <p style={{ marginTop: '8px' }}>
+            <Link href={`/contract/${address}`}>switch to contract view →</Link>
+          </p>
 
-          <h2>recent activity</h2>
+          <div className="section-title">
+            Recent Activity
+            <a
+              href="#"
+              className="refresh-btn"
+              onClick={(e) => { e.preventDefault(); setVisibleCount(10); loadData(); }}
+            >
+              refresh ↻
+            </a>
+          </div>
 
           {transfers.length === 0 ? (
             <p>no activity found</p>
@@ -157,74 +233,79 @@ export default function TokenPage({ params }) {
 
             return (
               <>
-                <div className="transfer-list">
+                <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="tx-group">
-                      {group.events.map((t, eventIndex) => (
-                        <p key={eventIndex} className="transfer-item">
-                          {t.type === 'mint' ? (
-                            <>
-                              <span className="success">+{formatAmount(t.amount)}</span> {getSymbol()}
-                              {' → '}
-                              <AddressLink address={t.to} />
-                              {' '}
-                              <span className="text-secondary">(minted)</span>
-                            </>
-                          ) : t.type === 'burn' ? (
-                            <>
-                              <AddressLink address={t.from} />
-                              {': '}
-                              <span>-{formatAmount(t.amount)}</span> {getSymbol()}
-                              {' '}
-                              <span className="text-secondary">(burned)</span>
-                            </>
-                          ) : t.type === 'clawback' ? (
-                            <>
-                              <AddressLink address={t.from} />
-                              {': '}
-                              <span className="error">-{formatAmount(t.amount)}</span> {getSymbol()}
-                              {' '}
-                              <span className="text-secondary">(clawback)</span>
-                            </>
-                          ) : (
-                            <>
-                              <AddressLink address={t.from} />
-                              {' → '}
-                              <AddressLink address={t.to} />
-                              {': '}
-                              {formatAmount(t.amount)} {getSymbol()}
-                            </>
-                          )}
-                        </p>
-                      ))}
-                      <small>
-                        {formatTimestamp(group.timestamp)}
-                        {' '}
-                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
-                      </small>
+                    <div key={group.txHash} className="card-item">
+                      {group.events.map((t, eventIndex) => {
+                        const typeInfo = getEventTypeInfo(t.type);
+
+                        return (
+                          <div key={eventIndex} style={{ marginBottom: eventIndex < group.events.length - 1 ? '12px' : '0' }}>
+                            <div className="activity-card-header">
+                              <div className="event-type">
+                                <span className={`event-dot ${typeInfo.dotClass}`} />
+                                {typeInfo.label}
+                              </div>
+                              {eventIndex === 0 && (
+                                <span className="activity-timestamp" title={new Date(group.timestamp).toLocaleString()}>
+                                  {formatRelativeTime(group.timestamp)}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="activity-addresses">
+                              {t.type === 'mint' ? (
+                                <>→ <AddressLink address={t.to} /></>
+                              ) : t.type === 'burn' ? (
+                                <AddressLink address={t.from} />
+                              ) : t.type === 'clawback' ? (
+                                <AddressLink address={t.from} />
+                              ) : (
+                                <>
+                                  <AddressLink address={t.from} />
+                                  {' → '}
+                                  <AddressLink address={t.to} />
+                                </>
+                              )}
+                            </div>
+
+                            <div className="activity-footer">
+                              <span className={`activity-amount ${
+                                t.type === 'mint' ? 'positive' :
+                                t.type === 'clawback' || t.type === 'burn' ? 'negative' : ''
+                              }`}>
+                                {t.type === 'mint' && '+'}
+                                {(t.type === 'burn' || t.type === 'clawback') && '-'}
+                                {formatAmount(t.amount)} {getSymbol()}
+                              </span>
+                              {eventIndex === group.events.length - 1 && (
+                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                  tx:{group.txHash?.substring(0, 4)}
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
 
-                <p>
-                  {visibleCount < txGroups.length && (
-                    <>
-                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
-                      {' | '}
-                    </>
-                  )}
-                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-                </p>
+                {visibleCount < txGroups.length && (
+                  <p style={{ textAlign: 'center' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
+                      show more
+                    </a>
+                  </p>
+                )}
               </>
             );
           })()}
         </>
       )}
 
-      <hr />
-
-      <p>
-        <Link href="/">new search</Link>
+      <p style={{ marginTop: '24px' }}>
+        <Link href="/">← new search</Link>
       </p>
     </div>
   );

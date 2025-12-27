@@ -2,17 +2,23 @@
 
 import Link from 'next/link';
 import NetworkSelector from './NetworkSelector';
+import ThemeToggle from './ThemeToggle';
 
 /**
  * Consistent page header for all scan pages
- * Displays title, network selector, and subtitle
+ * Displays title with network dropdown and theme toggle
  */
 export default function ScanHeader() {
   return (
-    <>
-      <h1><Link href="/">LUMENITOS SCAN</Link></h1>
-      <NetworkSelector />
-      <p className="subtitle">mini token explorer</p>
-    </>
+    <div className="scan-header">
+      <div className="scan-header-left">
+        <h1><Link href="/">LUMENITOS SCAN</Link></h1>
+        <p className="subtitle">mini token explorer</p>
+      </div>
+      <div className="scan-header-right">
+        <NetworkSelector />
+        <ThemeToggle />
+      </div>
+    </div>
   );
 }

@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { shortenAddress, getStellarExpertUrl, copyToClipboard } from '@/utils/scan/helpers';
+import { getStellarExpertUrl, copyToClipboard } from '@/utils/scan/helpers';
 import { useNetwork } from './NetworkContext';
 
 /**
- * Display an address with copy button and stellar.expert link
+ * Display an address in a styled box with copy button and stellar.expert link
  *
  * @param {Object} props
  * @param {string} props.address - The full address to display
- * @param {string} [props.label] - Optional label prefix (e.g., "contract:", "tx:")
+ * @param {string} [props.label] - Optional label (e.g., "Account", "Token", "Transaction")
  * @param {string} [props.type] - Override address type for stellar.expert link ('account', 'contract', 'tx')
  */
 export default function AddressDisplay({ address, label, type }) {
@@ -32,16 +32,17 @@ export default function AddressDisplay({ address, label, type }) {
   }
 
   return (
-    <p>
-      {label && <strong>{label}</strong>}{' '}
-      {shortenAddress(address)}{' '}
-      (<a href="#" onClick={handleCopy}>
-        {copied ? 'copied!' : 'copy'}
-      </a>)
-      {' | '}
-      <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
-        stellar.expert
-      </a>
-    </p>
+    <div className="address-box">
+      {label && <div className="address-label">{label}</div>}
+      <div className="address-value">{address}</div>
+      <div className="address-actions">
+        <a href="#" onClick={handleCopy}>
+          {copied ? 'copied!' : 'copy'}
+        </a>
+        <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+          ↗ stellar.expert
+        </a>
+      </div>
+    </div>
   );
 }

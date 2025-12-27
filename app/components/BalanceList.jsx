@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 /**
- * Display a list of token balances
+ * Display a list of token balances as cards
  *
  * @param {Object} props
  * @param {Array} props.balances - Array of balance objects
@@ -29,21 +29,27 @@ export default function BalanceList({
   };
 
   return (
-    <>
+    <div className="balance-list">
       {balances.map((b) => (
-        <p key={b.contractId} className="balance-row">
-          <span className="balance-amount">
-            {b.balance}{' '}
-            <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
-          </span>
-          {b.isManual && onRemove && (
-            <>
-              {' '}
-              (<a href="#" onClick={(e) => handleRemove(e, b.contractId)}>remove</a>)
-            </>
-          )}
-        </p>
+        <div key={b.contractId} className="balance-card">
+          <div className="balance-card-header">
+            <span className="balance-symbol">
+              <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
+            </span>
+            {b.isManual && onRemove && (
+              <a
+                href="#"
+                className="balance-remove"
+                onClick={(e) => handleRemove(e, b.contractId)}
+                title="Remove from tracked assets"
+              >
+                ✕
+              </a>
+            )}
+          </div>
+          <div className="balance-amount">{b.balance}</div>
+        </div>
       ))}
-    </>
+    </div>
   );
 }

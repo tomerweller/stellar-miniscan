@@ -14,8 +14,10 @@ import {
   AddressDisplay,
   AddressLink,
   useNetwork,
+  SkeletonActivity,
+  SkeletonText,
 } from '@/app/components';
-import { formatTimestamp } from '@/utils/scan/helpers';
+import { formatRelativeTime } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function LiquidityPoolPage({ params }) {
@@ -108,11 +110,20 @@ export default function LiquidityPoolPage({ params }) {
     };
   };
 
+  // Get event type display info
+  const getEventTypeInfo = (type) => {
+    switch (type) {
+      case 'mint': return { label: 'Mint', dotClass: 'success' };
+      case 'burn': return { label: 'Burn', dotClass: 'danger' };
+      case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+      default: return { label: 'Transfer', dotClass: '' };
+    }
+  };
+
   if (!isValid) {
     return (
       <div className="scan-page">
         <ScanHeader />
-        <hr />
         <p className="error">
           {!address?.startsWith('L')
             ? 'Liquidity pool view requires an L... address'
@@ -128,50 +139,105 @@ export default function LiquidityPoolPage({ params }) {
   return (
     <div className="scan-page page-lp">
       <ScanHeader />
-      <hr />
 
-      <AddressDisplay address={address} label="lp:" />
-
-      <hr />
+      <AddressDisplay address={address} label="Liquidity Pool" />
 
       {loading ? (
-        <p>loading...</p>
+        <>
+          <div className="section-title">Pool Info</div>
+          <div className="tx-meta">
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Type</span>
+              <SkeletonText width="120px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Fee</span>
+              <SkeletonText width="60px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Pool Shares</span>
+              <SkeletonText width="100px" />
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Trustlines</span>
+              <SkeletonText width="50px" />
+            </div>
+          </div>
+          <div className="section-title">Reserves</div>
+          <div className="balance-list">
+            <div className="balance-card">
+              <SkeletonText width="60px" />
+              <SkeletonText width="100px" />
+            </div>
+            <div className="balance-card">
+              <SkeletonText width="60px" />
+              <SkeletonText width="100px" />
+            </div>
+          </div>
+          <div className="section-title">Recent Activity</div>
+          <SkeletonActivity count={3} />
+        </>
       ) : error ? (
         <p className="error">error: {error}</p>
       ) : (
         <>
-          <h2>pool info</h2>
+          <div className="section-title">Pool Info</div>
 
-          <p><strong>type:</strong> constant product (AMM)</p>
-          <p><strong>fee:</strong> {formatFee(poolData.fee)}</p>
-          <p><strong>total pool shares:</strong> {formatPoolShares(poolData.totalPoolShares)}</p>
-          <p><strong>trustline count:</strong> {poolData.trustlineCount}</p>
+          <div className="tx-meta">
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Type</span>
+              <span className="tx-meta-value">Constant Product (AMM)</span>
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Fee</span>
+              <span className="tx-meta-value">{formatFee(poolData.fee)}</span>
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Pool Shares</span>
+              <span className="tx-meta-value">{formatPoolShares(poolData.totalPoolShares)}</span>
+            </div>
+            <div className="tx-meta-item">
+              <span className="tx-meta-label">Trustlines</span>
+              <span className="tx-meta-value">{poolData.trustlineCount}</span>
+            </div>
+          </div>
 
-          <hr />
+          <div className="section-title">Reserves</div>
 
-          <h2>reserves</h2>
+          <div className="balance-list">
+            <div className="balance-card">
+              <div className="balance-card-header">
+                <span className="balance-symbol">
+                  <Link href={`/token/${poolData.assetA.contractId}`}>
+                    {poolData.assetA.code}
+                  </Link>
+                </span>
+              </div>
+              <div className="balance-amount">{formatReserve(poolData.assetA.reserve)}</div>
+            </div>
 
-          <p className="balance-row">
-            <span className="balance-amount">
-              {formatReserve(poolData.assetA.reserve)}{' '}
-              <Link href={`/token/${poolData.assetA.contractId}`}>
-                {poolData.assetA.code}
-              </Link>
-            </span>
-          </p>
+            <div className="balance-card">
+              <div className="balance-card-header">
+                <span className="balance-symbol">
+                  <Link href={`/token/${poolData.assetB.contractId}`}>
+                    {poolData.assetB.code}
+                  </Link>
+                </span>
+              </div>
+              <div className="balance-amount">{formatReserve(poolData.assetB.reserve)}</div>
+            </div>
+          </div>
 
-          <p className="balance-row">
-            <span className="balance-amount">
-              {formatReserve(poolData.assetB.reserve)}{' '}
-              <Link href={`/token/${poolData.assetB.contractId}`}>
-                {poolData.assetB.code}
-              </Link>
-            </span>
-          </p>
-
-          <hr />
-
-          <h2>recent activity</h2>
+          <div className="section-title">
+            Recent Activity
+            <a
+              href="#"
+              className="refresh-btn"
+              onClick={(e) => { e.preventDefault(); setVisibleCount(10); loadData(); }}
+            >
+              refresh ↻
+            </a>
+          </div>
 
           {transfers.length === 0 ? (
             <p>no activity found</p>
@@ -190,81 +256,79 @@ export default function LiquidityPoolPage({ params }) {
 
             return (
               <>
-                <div className="transfer-list">
+                <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="tx-group">
+                    <div key={group.txHash} className="card-item">
                       {group.events.map((t, eventIndex) => {
                         const ft = formatTransfer(t);
+                        const typeInfo = getEventTypeInfo(t.type);
+
                         return (
-                          <p key={eventIndex} className="transfer-item">
-                            {t.type === 'mint' ? (
-                              <>
-                                <span className="success">+{ft.formattedAmount}</span>{' '}
-                                <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                                {' → '}
-                                <AddressLink address={t.to} />
-                                {' '}
-                                <span className="text-secondary">(minted)</span>
-                              </>
-                            ) : t.type === 'burn' ? (
-                              <>
+                          <div key={eventIndex} style={{ marginBottom: eventIndex < group.events.length - 1 ? '12px' : '0' }}>
+                            <div className="activity-card-header">
+                              <div className="event-type">
+                                <span className={`event-dot ${typeInfo.dotClass}`} />
+                                {typeInfo.label}
+                              </div>
+                              {eventIndex === 0 && (
+                                <span className="activity-timestamp" title={new Date(group.timestamp).toLocaleString()}>
+                                  {formatRelativeTime(group.timestamp)}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="activity-addresses">
+                              {t.type === 'mint' ? (
+                                <>→ <AddressLink address={t.to} /></>
+                              ) : t.type === 'burn' || t.type === 'clawback' ? (
                                 <AddressLink address={t.from} />
-                                {': '}
-                                <span>-{ft.formattedAmount}</span>{' '}
-                                <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                                {' '}
-                                <span className="text-secondary">(burned)</span>
-                              </>
-                            ) : t.type === 'clawback' ? (
-                              <>
-                                <AddressLink address={t.from} />
-                                {': '}
-                                <span className="error">-{ft.formattedAmount}</span>{' '}
-                                <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                                {' '}
-                                <span className="text-secondary">(clawback)</span>
-                              </>
-                            ) : (
-                              <>
-                                <AddressLink address={t.from} />
-                                {' → '}
-                                <AddressLink address={t.to} />
-                                {': '}
+                              ) : (
+                                <>
+                                  <AddressLink address={t.from} />
+                                  {' → '}
+                                  <AddressLink address={t.to} />
+                                </>
+                              )}
+                            </div>
+
+                            <div className="activity-footer">
+                              <span className={`activity-amount ${
+                                t.type === 'mint' ? 'positive' :
+                                t.type === 'clawback' || t.type === 'burn' ? 'negative' : ''
+                              }`}>
+                                {t.type === 'mint' && '+'}
+                                {(t.type === 'burn' || t.type === 'clawback') && '-'}
                                 {ft.formattedAmount}{' '}
                                 <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
-                              </>
-                            )}
-                          </p>
+                              </span>
+                              {eventIndex === group.events.length - 1 && (
+                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                  tx:{group.txHash?.substring(0, 4)}
+                                </Link>
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
-                      <small>
-                        {formatTimestamp(group.timestamp)}
-                        {' '}
-                        (<Link href={`/tx/${group.txHash}`}>{group.txHash?.substring(0, 4)}</Link>)
-                      </small>
                     </div>
                   ))}
                 </div>
 
-                <p>
-                  {visibleCount < txGroups.length && (
-                    <>
-                      <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>show more</a>
-                      {' | '}
-                    </>
-                  )}
-                  <a href="#" onClick={(e) => { e.preventDefault(); loadData(); }}>refresh</a>
-                </p>
+                {visibleCount < txGroups.length && (
+                  <p style={{ textAlign: 'center' }}>
+                    <a href="#" onClick={(e) => { e.preventDefault(); setVisibleCount(v => v + 10); }}>
+                      show more
+                    </a>
+                  </p>
+                )}
               </>
             );
           })()}
         </>
       )}
 
-      <hr />
-
-      <p>
-        <Link href="/">new search</Link>
+      <p style={{ marginTop: '24px' }}>
+        <Link href="/">← new search</Link>
       </p>
     </div>
   );
