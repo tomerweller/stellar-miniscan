@@ -187,11 +187,18 @@ function parseTransferEvent(event, targetAddress) {
 
   // SAC transfers have a 4th topic with the asset in "ticker:issuer" format
   let sacSymbol = null;
+  let sacName = null;
   if (topics.length >= 4 && topics[3]) {
     try {
       const assetStr = StellarSdk.scValToNative(topics[3]);
-      if (typeof assetStr === 'string' && assetStr.includes(':')) {
-        sacSymbol = assetStr.split(':')[0];
+      if (typeof assetStr === 'string') {
+        if (assetStr.includes(':')) {
+          sacSymbol = assetStr.split(':')[0];
+          sacName = assetStr;
+        } else if (assetStr === 'native') {
+          sacSymbol = 'XLM';
+          sacName = 'native';
+        }
       }
     } catch {
       // Not a string topic, ignore
@@ -211,6 +218,7 @@ function parseTransferEvent(event, targetAddress) {
     direction,
     counterparty: direction === 'sent' ? to : from,
     sacSymbol,
+    sacName,
   };
 }
 
@@ -540,11 +548,18 @@ function parseTransferEventGeneric(event) {
 
   // SAC transfers have a 4th topic with the asset in "ticker:issuer" format
   let sacSymbol = null;
+  let sacName = null;
   if (topics.length >= 4 && topics[3]) {
     try {
       const assetStr = StellarSdk.scValToNative(topics[3]);
-      if (typeof assetStr === 'string' && assetStr.includes(':')) {
-        sacSymbol = assetStr.split(':')[0];
+      if (typeof assetStr === 'string') {
+        if (assetStr.includes(':')) {
+          sacSymbol = assetStr.split(':')[0];
+          sacName = assetStr;
+        } else if (assetStr === 'native') {
+          sacSymbol = 'XLM';
+          sacName = 'native';
+        }
       }
     } catch {
       // Not a string topic, ignore
@@ -560,6 +575,7 @@ function parseTransferEventGeneric(event) {
     to,
     amount,
     sacSymbol,
+    sacName,
   };
 }
 
@@ -612,7 +628,7 @@ function getMetadataCacheKey() {
  * @param {string} contractId - Token contract ID
  * @returns {object|null} Cached metadata or null
  */
-function getCachedMetadata(contractId) {
+export function getCachedMetadata(contractId) {
   if (typeof window === 'undefined') return null;
   try {
     const cacheKey = getMetadataCacheKey();
@@ -641,6 +657,25 @@ function setCachedMetadata(contractId, metadata) {
   } catch {
     // Ignore cache errors
   }
+}
+
+/**
+ * Cache token metadata from SAC (Stellar Asset Contract) events.
+ * SAC tokens have the symbol in the 4th topic and always use 7 decimals.
+ * Only caches if the contract is not already cached.
+ * @param {string} contractId - Token contract ID
+ * @param {string} sacSymbol - Symbol from SAC event (e.g., "XLM" or "USDC")
+ * @param {string} sacFullName - Full SAC identifier (e.g., "USDC:GA5ZSE..." or "native")
+ */
+export function cacheSacMetadata(contractId, sacSymbol, sacFullName) {
+  if (!contractId || !sacSymbol) return;
+  // Only cache if not already cached (don't overwrite richer metadata from contract queries)
+  if (getCachedMetadata(contractId)) return;
+  setCachedMetadata(contractId, {
+    symbol: sacSymbol,
+    name: sacFullName || sacSymbol,
+    decimals: 7,
+  });
 }
 
 /**

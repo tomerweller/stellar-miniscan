@@ -9,6 +9,7 @@ import {
   getContractInvocations,
   getRecentTransfers,
   extractContractIds,
+  cacheSacMetadata,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import {
@@ -61,10 +62,13 @@ export default function ContractPage({ params }) {
 
       // Build SAC metadata cache from transfer events with sacSymbol (4th topic)
       // These are standard Stellar assets with known symbol and decimals=7
+      // Also persist to localStorage for reuse across pages and sessions
       const sacMetadataCache = {};
       for (const t of transferList) {
         if (t.sacSymbol && t.contractId) {
-          sacMetadataCache[t.contractId] = { symbol: t.sacSymbol, decimals: 7 };
+          sacMetadataCache[t.contractId] = { symbol: t.sacSymbol, name: t.sacName, decimals: 7 };
+          // Cache to localStorage (only if not already cached)
+          cacheSacMetadata(t.contractId, t.sacSymbol, t.sacName);
         }
       }
 
@@ -83,7 +87,7 @@ export default function ContractPage({ params }) {
                 return {
                   contractId,
                   symbol: cachedSac.symbol,
-                  name: `${cachedSac.symbol} (Stellar Asset)`,
+                  name: cachedSac.name || cachedSac.symbol,
                   rawBalance,
                   balance: formatTokenBalance(displayBalance, 7),
                   decimals: 7,
@@ -110,7 +114,7 @@ export default function ContractPage({ params }) {
               return {
                 contractId,
                 symbol: cachedSac?.symbol || '???',
-                name: cachedSac ? `${cachedSac.symbol} (Stellar Asset)` : 'Unknown',
+                name: cachedSac?.name || cachedSac?.symbol || 'Unknown',
                 rawBalance: '0',
                 balance: '0',
                 decimals: 7,
