@@ -249,7 +249,13 @@ async function rpcCall(method, params) {
 
   const data = await response.json();
   if (data.error) {
-    throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+    // Include error code in message for specific error handling
+    // -32001 = processing limit exceeded (too much data)
+    const errorCode = data.error.code;
+    const errorMessage = data.error.message || JSON.stringify(data.error);
+    const error = new Error(`RPC error: [${errorCode}] ${errorMessage}`);
+    error.code = errorCode;
+    throw error;
   }
 
   return data.result;

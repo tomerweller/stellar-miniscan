@@ -30,6 +30,7 @@ export default function AccountPage({ params }) {
   const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
   const [activity, setActivity] = useState([]); // Unified transfers + fees
+  const [activityError, setActivityError] = useState(null); // Error message for activity section
   const [tokenInfo, setTokenInfo] = useState({}); // { contractId: { symbol, decimals } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,19 +51,27 @@ export default function AccountPage({ params }) {
   const loadData = async () => {
     setLoading(true);
     setError(null);
+    setActivityError(null);
     setVisibleCount(10);
 
     try {
       // Step 1: Fetch unified activity (transfers + fees in single query)
       // Activity fetch may fail for new/inactive accounts - that's ok
       let activityList = [];
+      let activityError = null;
       try {
         activityList = await getAccountActivity(address);
       } catch (e) {
-        // Account may not have any activity or contract not found - continue with empty list
-        console.log('No activity found for account:', e.message);
+        // Check for processing limit error (-32001) - account has too much activity
+        if (e.code === -32001 || e.message?.includes('-32001')) {
+          activityError = 'too much data';
+        } else {
+          // Other errors - continue with empty list
+          console.log('No activity found for account:', e.message);
+        }
       }
       setActivity(activityList);
+      setActivityError(activityError);
 
       // Step 2: Extract unique contract IDs from transfers + manually tracked assets
       // Filter to only include transfer events (not fee events)
@@ -334,7 +343,9 @@ export default function AccountPage({ params }) {
 
           <h2>token activity</h2>
 
-          {activity.length === 0 ? (
+          {activityError ? (
+            <p className="error">{activityError}</p>
+          ) : activity.length === 0 ? (
             <p>no token activity found</p>
           ) : (() => {
             // Group events by transaction hash
