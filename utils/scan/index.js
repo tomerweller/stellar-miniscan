@@ -274,12 +274,12 @@ export async function getAccountActivity(address, limit = 200) {
       rpcCall('getEvents', {
         startLedger: startLedger,
         filters: [tokenFilter],
-        pagination: { limit: limit * 5, order: 'desc' }
+        pagination: { limit, order: 'desc' }
       }),
       rpcCall('getEvents', {
         startLedger: startLedger,
         filters: [feeFilter],
-        pagination: { limit: limit, order: 'desc' }
+        pagination: { limit, order: 'desc' }
       }),
     ]);
 
