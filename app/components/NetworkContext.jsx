@@ -3,11 +3,14 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { getSelectedNetwork, setSelectedNetwork } from '@/utils/config';
+import { getLedgerRange } from '@/utils/scan';
 
 const NetworkContext = createContext({
   network: 'testnet',
   setNetwork: () => {},
   isLoading: true,
+  ledgerRange: null,
+  updateLedgerRange: () => {},
 });
 
 export function useNetwork() {
@@ -17,9 +20,20 @@ export function useNetwork() {
 export function NetworkProvider({ children }) {
   const [network, setNetworkState] = useState('testnet');
   const [isLoading, setIsLoading] = useState(true);
+  const [ledgerRange, setLedgerRange] = useState(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+
+  // Fetch ledger range when network changes
+  const updateLedgerRange = useCallback(async () => {
+    try {
+      const range = await getLedgerRange();
+      setLedgerRange(range);
+    } catch (err) {
+      console.error('Failed to fetch ledger range:', err);
+    }
+  }, []);
 
   // Initialize from URL param or localStorage on mount
   useEffect(() => {
@@ -39,6 +53,13 @@ export function NetworkProvider({ children }) {
     }
     setIsLoading(false);
   }, [searchParams, router, pathname]);
+
+  // Fetch ledger range on initial load and when network changes
+  useEffect(() => {
+    if (!isLoading) {
+      updateLedgerRange();
+    }
+  }, [network, isLoading, updateLedgerRange]);
 
   // Listen for network changes from other tabs/components
   useEffect(() => {
@@ -60,7 +81,7 @@ export function NetworkProvider({ children }) {
   }, [router, searchParams, pathname]);
 
   return (
-    <NetworkContext.Provider value={{ network, setNetwork, isLoading }}>
+    <NetworkContext.Provider value={{ network, setNetwork, isLoading, ledgerRange, updateLedgerRange }}>
       {children}
     </NetworkContext.Provider>
   );

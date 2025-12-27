@@ -79,6 +79,29 @@ async function getLatestLedger() {
 }
 
 /**
+ * Get the ledger range info from the RPC
+ * Returns ledger numbers and approximate timestamps (based on ~5 sec per ledger)
+ * @returns {Promise<{latestLedger: number, oldestLedger: number, oldestDate: Date, latestDate: Date}>}
+ */
+export async function getLedgerRange() {
+  const result = await rpcCall('getHealth');
+  const { latestLedger, oldestLedger } = result;
+
+  // Calculate approximate dates (ledgers close every ~5 seconds)
+  const now = new Date();
+  const ledgerDiff = latestLedger - oldestLedger;
+  const secondsDiff = ledgerDiff * 5; // ~5 seconds per ledger
+  const oldestDate = new Date(now.getTime() - secondsDiff * 1000);
+
+  return {
+    latestLedger,
+    oldestLedger,
+    oldestDate,
+    latestDate: now,
+  };
+}
+
+/**
  * Create an RPC server for scan operations
  * Uses the shared RPC URL from config
  */
