@@ -6,6 +6,13 @@ export const metadata = {
   title: 'Stellar MiniScan',
   description: 'A Minimal Stellar Token Explorer',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: '/icon-192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -24,7 +31,7 @@ export const metadata = {
 };
 
 export const viewport = {
-  themeColor: '#000000',
+  themeColor: '#4a7c59',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

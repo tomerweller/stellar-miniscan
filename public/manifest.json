@@ -4,8 +4,8 @@
   "description": "A Mini Stellar Token Explorer",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#4a7c59",
+  "theme_color": "#4a7c59",
   "icons": [
     {
       "src": "/icon-192.png",

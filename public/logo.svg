@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#4a7c59"/>
+
+  <!-- Four-pointed star (✦) -->
+  <path d="M256 56 L288 208 L440 256 L288 304 L256 456 L224 304 L72 256 L224 208 Z" fill="#ffffff"/>
+</svg>
