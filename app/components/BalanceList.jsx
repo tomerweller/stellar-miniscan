@@ -31,24 +31,21 @@ export default function BalanceList({
   return (
     <div className="balance-list">
       {balances.map((b) => (
-        <div key={b.contractId} className="balance-card">
+        <Link href={`/token/${b.contractId}`} key={b.contractId} className="balance-card">
           <div className="balance-card-header">
-            <span className="balance-symbol">
-              <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
-            </span>
+            <span className="balance-symbol">{b.symbol}</span>
             {b.isManual && onRemove && (
-              <a
-                href="#"
+              <span
                 className="balance-remove"
                 onClick={(e) => handleRemove(e, b.contractId)}
                 title="Remove from tracked assets"
               >
                 ✕
-              </a>
+              </span>
             )}
           </div>
           <div className="balance-amount">{b.balance}</div>
-        </div>
+        </Link>
       ))}
     </div>
   );

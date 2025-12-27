@@ -320,10 +320,10 @@ export async function getAccountActivity(address, limit = 200) {
 /**
  * Get fee events for an address (CAP-67)
  * @param {string} address - Address to fetch fee events for
- * @param {number} limit - Maximum events to return (default 1000)
+ * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed fee events
  */
-export async function getFeeEvents(address, limit = 1000) {
+export async function getFeeEvents(address, limit = 200) {
   try {
     const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
     const startLedger = await getLatestLedger();
@@ -402,10 +402,10 @@ export async function getRecentTokenActivity(limit = 50) {
 /**
  * Get recent activity for a specific token contract
  * @param {string} tokenContractId - Token contract ID
- * @param {number} limit - Maximum events to return (default 1000)
+ * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed token events
  */
-export async function getTokenTransfers(tokenContractId, limit = 1000) {
+export async function getTokenTransfers(tokenContractId, limit = 200) {
   try {
     const startLedger = await getLatestLedger();
     const filter = buildTokenActivityFilters(tokenContractId);
@@ -444,10 +444,10 @@ export async function getTokenTransfers(tokenContractId, limit = 1000) {
 /**
  * Get recent invocations for a contract
  * @param {string} contractId - Contract ID
- * @param {number} limit - Maximum events to return (default 100)
+ * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed invocation events
  */
-export async function getContractInvocations(contractId, limit = 100) {
+export async function getContractInvocations(contractId, limit = 200) {
   try {
     const startLedger = await getLatestLedger();
 

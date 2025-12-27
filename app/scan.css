@@ -461,11 +461,19 @@ a.card-item:hover {
 
 /* Balance cards */
 .balance-card {
+  display: block;
   background: var(--surface);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 14px 16px;
   margin-bottom: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+.balance-card:hover {
+  background-color: var(--hover-color);
 }
 
 .balance-card-header {
@@ -478,15 +486,6 @@ a.card-item:hover {
 .balance-symbol {
   font-weight: 600;
   font-size: 0.9375em;
-}
-
-.balance-symbol a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.balance-symbol a:hover {
-  color: var(--primary-color);
 }
 
 .balance-amount {

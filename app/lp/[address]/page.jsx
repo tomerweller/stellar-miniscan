@@ -205,27 +205,19 @@ export default function LiquidityPoolPage({ params }) {
           <div className="section-title">Reserves</div>
 
           <div className="balance-list">
-            <div className="balance-card">
+            <Link href={`/token/${poolData.assetA.contractId}`} className="balance-card">
               <div className="balance-card-header">
-                <span className="balance-symbol">
-                  <Link href={`/token/${poolData.assetA.contractId}`}>
-                    {poolData.assetA.code}
-                  </Link>
-                </span>
+                <span className="balance-symbol">{poolData.assetA.code}</span>
               </div>
               <div className="balance-amount">{formatReserve(poolData.assetA.reserve)}</div>
-            </div>
+            </Link>
 
-            <div className="balance-card">
+            <Link href={`/token/${poolData.assetB.contractId}`} className="balance-card">
               <div className="balance-card-header">
-                <span className="balance-symbol">
-                  <Link href={`/token/${poolData.assetB.contractId}`}>
-                    {poolData.assetB.code}
-                  </Link>
-                </span>
+                <span className="balance-symbol">{poolData.assetB.code}</span>
               </div>
               <div className="balance-amount">{formatReserve(poolData.assetB.reserve)}</div>
-            </div>
+            </Link>
           </div>
 
           <div className="section-title">

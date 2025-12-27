@@ -228,14 +228,12 @@ export default function ContractPage({ params }) {
           ) : (
             <div className="balance-list">
               {balances.map((b) => (
-                <div key={b.contractId} className="balance-card">
+                <Link href={`/token/${b.contractId}`} key={b.contractId} className="balance-card">
                   <div className="balance-card-header">
-                    <span className="balance-symbol">
-                      <Link href={`/token/${b.contractId}`}>{b.symbol}</Link>
-                    </span>
+                    <span className="balance-symbol">{b.symbol}</span>
                   </div>
                   <div className="balance-amount">{b.balance}</div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
