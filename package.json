@@ -2,10 +2,13 @@
   "name": "lumenitos-scan",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "14.4.3",
@@ -14,5 +17,9 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0"
   }
 }
