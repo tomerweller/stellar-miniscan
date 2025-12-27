@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import * as StellarSdk from '@stellar/stellar-sdk';
+import config from '@/utils/config';
 import {
   isValidAddress,
   getTokenBalance,
@@ -55,23 +57,38 @@ export default function AccountPage({ params }) {
     setVisibleCount(10);
 
     try {
-      // Step 1: Fetch unified activity (transfers + fees in single query)
+      // Get the XLM contract ID - always show XLM balance regardless of activity
+      const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
+
+      // Fetch XLM balance and activity in parallel
       // Activity fetch may fail for new/inactive accounts - that's ok
       let activityList = [];
-      let activityError = null;
-      try {
-        activityList = await getAccountActivity(address);
-      } catch (e) {
-        // Check for processing limit error (-32001) - account has too much activity
+      let activityErr = null;
+      let xlmBalance = '0';
+
+      const [activityResult, xlmBalanceResult] = await Promise.allSettled([
+        getAccountActivity(address),
+        getTokenBalance(address, xlmContractId),
+      ]);
+
+      // Handle activity result
+      if (activityResult.status === 'fulfilled') {
+        activityList = activityResult.value;
+      } else {
+        const e = activityResult.reason;
         if (e.code === -32001 || e.message?.includes('-32001')) {
-          activityError = 'too much data';
+          activityErr = 'too much data';
         } else {
-          // Other errors - continue with empty list
           console.log('No activity found for account:', e.message);
         }
       }
       setActivity(activityList);
-      setActivityError(activityError);
+      setActivityError(activityErr);
+
+      // Handle XLM balance result
+      if (xlmBalanceResult.status === 'fulfilled') {
+        xlmBalance = xlmBalanceResult.value;
+      }
 
       // Step 2: Extract unique contract IDs from transfers + manually tracked assets
       // Filter to only include transfer events (not fee events)
@@ -92,19 +109,34 @@ export default function AccountPage({ params }) {
         }
       }
 
-      // Merge and dedupe contract IDs
-      const allContractIds = [...new Set([...autoContractIds, ...manualContractIds])];
+      // Merge and dedupe contract IDs (exclude XLM - we handle it separately)
+      const otherContractIds = [...new Set([...autoContractIds, ...manualContractIds])]
+        .filter(id => id !== xlmContractId);
 
-      if (allContractIds.length === 0) {
-        setBalances([]);
+      // Always include XLM balance
+      const xlmDisplayBalance = rawToDisplay(xlmBalance, 7);
+      const xlmBalanceObj = {
+        contractId: xlmContractId,
+        symbol: 'XLM',
+        name: 'native',
+        rawBalance: xlmBalance,
+        balance: formatTokenBalance(xlmDisplayBalance, 7),
+        decimals: 7,
+        isManual: false,
+      };
+
+      if (otherContractIds.length === 0) {
+        // Only XLM balance
+        setBalances([xlmBalanceObj]);
+        setTokenInfo({ [xlmContractId]: { symbol: 'XLM', decimals: 7 } });
         setLoading(false);
         return;
       }
 
-      // Step 3: Fetch metadata and balances for each token in parallel
+      // Step 3: Fetch metadata and balances for other tokens in parallel
       // For SAC tokens (with cached metadata), skip metadata fetch
       const tokenData = await Promise.all(
-        allContractIds.map(async (contractId) => {
+        otherContractIds.map(async (contractId) => {
           const isManual = manualContractIds.includes(contractId);
           const cachedSac = sacMetadataCache[contractId];
 
@@ -156,18 +188,19 @@ export default function AccountPage({ params }) {
         })
       );
 
-      // Build token info lookup map (symbol + decimals)
-      const infoMap = {};
+      // Build token info lookup map (symbol + decimals) - include XLM
+      const infoMap = { [xlmContractId]: { symbol: 'XLM', decimals: 7 } };
       for (const token of tokenData) {
         infoMap[token.contractId] = { symbol: token.symbol, decimals: token.decimals };
       }
       setTokenInfo(infoMap);
 
       // Filter out tokens with zero balance (unless manually tracked) and sort by symbol
-      const displayBalances = tokenData
+      // Always include XLM at the start
+      const otherBalances = tokenData
         .filter(t => t.rawBalance !== '0' || t.isManual)
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
-      setBalances(displayBalances);
+      setBalances([xlmBalanceObj, ...otherBalances]);
     } catch (err) {
       console.error('Error loading data:', err);
       setError(err.message);
