@@ -17,7 +17,7 @@ import {
   SkeletonActivity,
   SkeletonText,
 } from '@/app/components';
-import { formatRelativeTime } from '@/utils/scan/helpers';
+import { formatRelativeTime, formatErrorMessage } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function TokenPage({ params }) {
@@ -175,9 +175,7 @@ export default function TokenPage({ params }) {
       ) : error ? (
         <>
           <AddressDisplay address={address} label="Token" />
-          <p className="error">
-            {error.includes('not found') ? 'token contract not found' : `error: ${error}`}
-          </p>
+          <p className="error">{formatErrorMessage(error)}</p>
         </>
       ) : (
         <>

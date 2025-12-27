@@ -17,7 +17,7 @@ import {
   SkeletonActivity,
   SkeletonText,
 } from '@/app/components';
-import { formatRelativeTime } from '@/utils/scan/helpers';
+import { formatRelativeTime, formatErrorMessage } from '@/utils/scan/helpers';
 import '@/app/scan.css';
 
 export default function LiquidityPoolPage({ params }) {
@@ -178,7 +178,7 @@ export default function LiquidityPoolPage({ params }) {
           <SkeletonActivity count={3} />
         </>
       ) : error ? (
-        <p className="error">error: {error}</p>
+        <p className="error">{formatErrorMessage(error)}</p>
       ) : (
         <>
           <div className="section-title">Pool Info</div>

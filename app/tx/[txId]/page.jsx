@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolShareMetadata, cacheSacMetadata } from '@/utils/scan';
 import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { getAddressPath, formatUnixTimestamp, shortenAddress } from '@/utils/scan/helpers';
-import { ScanHeader, AddressDisplay, useNetwork, SkeletonText, SkeletonCard } from '@/app/components';
+import { getAddressPath, formatUnixTimestamp, shortenAddress, formatErrorMessage } from '@/utils/scan/helpers';
+import { ScanHeader, AddressDisplay, AddressLink, useNetwork, SkeletonText, SkeletonCard } from '@/app/components';
 
 // SEP-41 token event types
 const SEP41_EVENT_TYPES = ['transfer', 'mint', 'burn', 'clawback', 'approve', 'set_admin'];
@@ -392,7 +392,7 @@ export default function TransactionPage({ params }) {
           <SkeletonCard />
         </>
       ) : error ? (
-        <p className="error">error: {error}</p>
+        <p className="error">{formatErrorMessage(error)}</p>
       ) : !txData ? (
         <p>transaction not found</p>
       ) : (
@@ -529,16 +529,11 @@ export default function TransactionPage({ params }) {
                 const decimals = token?.decimals ?? 7;
 
                 // Extract raw amount from event data
-                // stellar-xdr-json can encode data as:
-                // 1. Direct value: { i128: "1" } or { i64: "1" }
-                // 2. Map with amount field: { map: [{ key: { symbol: "amount" }, val: { i128: "1" } }] }
                 const getRawAmount = () => {
                   if (!event.data) return null;
 
-                  // Helper to parse numeric ScVal from stellar-xdr-json format
                   const parseNumericScVal = (val) => {
                     if (!val) return null;
-                    // stellar-xdr-json encodes i128/u128 as string numbers
                     if (val.i128 !== undefined) return BigInt(val.i128);
                     if (val.u128 !== undefined) return BigInt(val.u128);
                     if (val.i64 !== undefined) return BigInt(val.i64);
@@ -548,7 +543,6 @@ export default function TransactionPage({ params }) {
                     return null;
                   };
 
-                  // Check if data is a map (SEP-41 muxed transfer format)
                   if (event.data.map && Array.isArray(event.data.map)) {
                     for (const entry of event.data.map) {
                       if (entry.key?.symbol === 'amount') {
@@ -558,7 +552,6 @@ export default function TransactionPage({ params }) {
                     return null;
                   }
 
-                  // Direct value (non-muxed transfer)
                   return parseNumericScVal(event.data);
                 };
 
@@ -568,26 +561,8 @@ export default function TransactionPage({ params }) {
                   : null;
 
                 // Extract addresses from topics based on event type
-                // SEP-41 topic structure varies by event:
-                // - transfer: [symbol, from_addr, to_addr]
-                // - mint: [symbol, to_addr, ...]
-                // - burn/clawback: [symbol, from_addr, ...]
-                // - approve: [symbol, from_addr, spender_addr]
-                // - set_admin: [symbol, new_admin_addr]
                 const getAddress = (topicIndex) => event.topics?.[topicIndex]?.address;
-                const minify = (addr) => addr ? addr.substring(0, 5) : null;
 
-                // Helper to render address with appropriate linking
-                // B... addresses are claimable balance IDs, not linkable
-                const renderAddr = (addr) => {
-                  if (!addr) return '?';
-                  if (addr.startsWith('B')) {
-                    return <span className="text-secondary">{minify(addr)}</span>;
-                  }
-                  return <Link href={getAddressPath(addr)}>{minify(addr)}</Link>;
-                };
-
-                // Determine from/to addresses based on event type
                 let fromAddr = null;
                 let toAddr = null;
 
@@ -598,17 +573,17 @@ export default function TransactionPage({ params }) {
                     toAddr = getAddress(2);
                     break;
                   case 'mint':
-                    toAddr = getAddress(1); // mint only has recipient
+                    toAddr = getAddress(1);
                     break;
                   case 'burn':
                   case 'clawback':
-                    fromAddr = getAddress(1); // burn/clawback only has source
+                    fromAddr = getAddress(1);
                     break;
                   case 'set_admin':
-                    fromAddr = getAddress(1); // new admin address
+                    fromAddr = getAddress(1);
                     break;
                   case 'fee':
-                    fromAddr = getAddress(1); // account paying/receiving the fee
+                    fromAddr = getAddress(1);
                     break;
                   default:
                     fromAddr = getAddress(1);
@@ -622,81 +597,61 @@ export default function TransactionPage({ params }) {
                   ? formatTokenBalance(rawToDisplay(absAmount, 7), 7)
                   : formattedAmount;
 
-                // Render human-readable event description
-                const renderEventDescription = () => {
-                  const symbolLink = <Link href={`/token/${event.contractId}`}>{symbol}</Link>;
-
+                // Get event type display info
+                const getEventTypeInfo = () => {
                   switch (event.eventType) {
-                    case 'fee':
-                      return (
-                        <p className="event-description">
-                          <span className={isRefund ? 'success' : ''}>
-                            {isRefund ? '+' : '-'}{displayAmount || '?'} XLM
-                          </span>
-                          {' '}
-                          <span style={{ color: 'var(--text-secondary)' }}>
-                            ({isRefund ? 'refund' : 'fee'})
-                          </span>
-                          {' '}
-                          {fromAddr ? renderAddr(fromAddr) : ''}
-                        </p>
-                      );
-                    case 'transfer':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: transfer {formattedAmount || '?'} from{' '}
-                          {renderAddr(fromAddr)}{' '}
-                          to {renderAddr(toAddr)}
-                        </p>
-                      );
-                    case 'mint':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: mint {formattedAmount || '?'} to{' '}
-                          {renderAddr(toAddr)}
-                        </p>
-                      );
-                    case 'burn':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: burn {formattedAmount || '?'} from{' '}
-                          {renderAddr(fromAddr)}
-                        </p>
-                      );
-                    case 'clawback':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: clawback {formattedAmount || '?'} from{' '}
-                          {renderAddr(fromAddr)}
-                        </p>
-                      );
-                    case 'approve':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: approve {formattedAmount || '?'} from{' '}
-                          {renderAddr(fromAddr)}{' '}
-                          to {renderAddr(toAddr)}
-                        </p>
-                      );
-                    case 'set_admin':
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: set_admin{' '}
-                          {renderAddr(fromAddr)}
-                        </p>
-                      );
-                    default:
-                      return (
-                        <p className="event-description">
-                          {symbolLink}: {event.eventType} {formattedAmount || ''}
-                        </p>
-                      );
+                    case 'mint': return { label: 'Mint', dotClass: 'success' };
+                    case 'burn': return { label: 'Burn', dotClass: 'danger' };
+                    case 'clawback': return { label: 'Clawback', dotClass: 'danger' };
+                    case 'approve': return { label: 'Approve', dotClass: '' };
+                    case 'set_admin': return { label: 'Set Admin', dotClass: '' };
+                    case 'fee': return { label: isRefund ? 'Fee Refund' : 'Fee', dotClass: isRefund ? 'success' : '' };
+                    default: return { label: 'Transfer', dotClass: '' };
                   }
                 };
 
+                const typeInfo = getEventTypeInfo();
+
                 return (
                   <div key={index} className="card-item">
-                    {renderEventDescription()}
+                    <div className="activity-card-header">
+                      <div className="event-type">
+                        <span className={`event-dot ${typeInfo.dotClass}`} />
+                        {typeInfo.label}
+                      </div>
+                      <Link href={`/token/${event.contractId}`} className="text-secondary">
+                        {symbol}
+                      </Link>
+                    </div>
+
+                    <div className="activity-addresses">
+                      {event.eventType === 'mint' ? (
+                        <>→ <AddressLink address={toAddr} /></>
+                      ) : event.eventType === 'burn' || event.eventType === 'clawback' ? (
+                        <AddressLink address={fromAddr} />
+                      ) : event.eventType === 'set_admin' ? (
+                        <AddressLink address={fromAddr} />
+                      ) : event.eventType === 'fee' ? (
+                        <AddressLink address={fromAddr} />
+                      ) : (
+                        <>
+                          <AddressLink address={fromAddr} />
+                          {' → '}
+                          <AddressLink address={toAddr} />
+                        </>
+                      )}
+                    </div>
+
+                    <div className="activity-footer">
+                      <span className={`activity-amount ${
+                        event.eventType === 'mint' || isRefund ? 'positive' :
+                        event.eventType === 'clawback' || event.eventType === 'burn' || event.eventType === 'fee' ? 'negative' : ''
+                      }`}>
+                        {(event.eventType === 'mint' || isRefund) && '+'}
+                        {(event.eventType === 'burn' || event.eventType === 'clawback' || (event.eventType === 'fee' && !isRefund)) && '-'}
+                        {displayAmount || '?'} {symbol}
+                      </span>
+                    </div>
                   </div>
                 );
               })}

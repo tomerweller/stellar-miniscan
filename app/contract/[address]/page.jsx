@@ -16,6 +16,7 @@ import {
   formatRelativeTime,
   formatTopicValue,
   shortenAddressSmall,
+  formatErrorMessage,
 } from '@/utils/scan/helpers';
 import { useNetwork, ScanHeader, AddressDisplay, AddressLink, SkeletonActivity, SkeletonBalance } from '@/app/components';
 import '@/app/scan.css';
@@ -217,7 +218,7 @@ export default function ContractPage({ params }) {
           <SkeletonActivity count={3} />
         </>
       ) : error ? (
-        <p className="error">error: {error}</p>
+        <p className="error">{formatErrorMessage(error)}</p>
       ) : (
         <>
           <div className="section-title">Balances</div>

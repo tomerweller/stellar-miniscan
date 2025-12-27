@@ -17,7 +17,7 @@ import {
   cacheSacMetadata,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
-import { formatRelativeTime } from '@/utils/scan/helpers';
+import { formatRelativeTime, formatErrorMessage } from '@/utils/scan/helpers';
 import {
   ScanHeader,
   AddressDisplay,
@@ -362,7 +362,7 @@ export default function AccountPage({ params }) {
           <SkeletonActivity count={5} />
         </>
       ) : error ? (
-        <p className="error">error: {error}</p>
+        <p className="error">{formatErrorMessage(error)}</p>
       ) : (
         <>
           <div className="section-title">Balances</div>

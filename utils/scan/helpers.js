@@ -234,3 +234,31 @@ export const getNetworkClass = () => {
 export const getNetworkLabel = () => {
   return config.isTestnet ? config.stellar.network : 'MAINNET';
 };
+
+/**
+ * Format error message for user-friendly display
+ * Converts technical RPC errors to readable messages
+ * @param {string} error - The error message
+ * @returns {string} User-friendly error message
+ */
+export const formatErrorMessage = (error) => {
+  if (!error) return 'Unknown error';
+
+  // RPC error -32001: request exceeded processing limit threshold
+  if (error.includes('-32001') || error.includes('processing limit')) {
+    return 'Too much data to process. Try a different query or check back later.';
+  }
+
+  // Network/connection errors
+  if (error.includes('fetch') || error.includes('network') || error.includes('ECONNREFUSED')) {
+    return 'Network error. Please check your connection and try again.';
+  }
+
+  // Not found errors
+  if (error.includes('not found') || error.includes('404')) {
+    return 'Not found';
+  }
+
+  // Return original error if no special handling
+  return error;
+};
