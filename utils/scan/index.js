@@ -612,34 +612,42 @@ export async function getAccountActivity(address, limit = 200) {
 
     const startLedger = await getLatestLedger();
 
-    // Single query with 2 filters:
-    // - Filter 1: Token events (5 topic patterns for transfer/mint/burn/clawback)
-    // - Filter 2: Fee events (needs contractIds, so separate filter)
-    const result = await rpcCall('getEvents', {
-      startLedger: startLedger,
-      filters: [
-        // Token events: 5 topic patterns in 1 filter (OR logic)
-        {
-          type: 'contract',
-          topics: [
-            [transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**'],  // transfers FROM
-            [transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // transfers TO
-            [mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],      // mint TO
-            [burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**'],           // burn FROM
-            [clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // clawback FROM
-          ],
-        },
-        // Fee events (separate filter because it needs contractIds)
-        {
-          type: 'contract',
-          contractIds: [xlmContractId],
-          topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
-        },
-      ],
-      pagination: { limit: limit * 6, order: 'desc' }
-    });
+    // Two parallel queries:
+    // - Query 1: 1 filter with 5 topic patterns for token events (OR logic)
+    // - Query 2: 1 filter for fee events (with XLM contractId)
+    const [tokenResult, feeResult] = await Promise.all([
+      // Token events: 1 filter with 5 topic patterns (OR logic)
+      rpcCall('getEvents', {
+        startLedger: startLedger,
+        filters: [
+          {
+            type: 'contract',
+            topics: [
+              [transferSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '*', '**'],  // transfers FROM
+              [transferSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // transfers TO
+              [mintSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],      // mint TO
+              [burnSymbol.toXDR('base64'), targetScVal.toXDR('base64'), '**'],           // burn FROM
+              [clawbackSymbol.toXDR('base64'), '*', targetScVal.toXDR('base64'), '**'],  // clawback FROM
+            ],
+          },
+        ],
+        pagination: { limit: limit * 5, order: 'desc' }
+      }),
+      // Fee events (with XLM contractId)
+      rpcCall('getEvents', {
+        startLedger: startLedger,
+        filters: [
+          {
+            type: 'contract',
+            contractIds: [xlmContractId],
+            topics: [[feeSymbol.toXDR('base64'), targetScVal.toXDR('base64')]],
+          },
+        ],
+        pagination: { limit: limit, order: 'desc' }
+      }),
+    ]);
 
-    const allEvents = result.events || [];
+    const allEvents = [...(tokenResult.events || []), ...(feeResult.events || [])];
 
     // Parse each event based on first topic, dedupe by event ID
     const uniqueById = new Map();
