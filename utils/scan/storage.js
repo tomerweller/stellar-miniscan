@@ -1,5 +1,5 @@
 /**
- * Storage abstractions for Lumenitos Scan
+ * Storage abstractions for Stellar MiniScan
  *
  * Provides localStorage wrappers for caching and persistence.
  * Abstracts storage access to make testing easier.

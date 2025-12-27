@@ -1,5 +1,5 @@
 /**
- * Shared display helpers for Lumenitos Scan
+ * Shared display helpers for Stellar MiniScan
  *
  * These utilities are used across multiple scan pages for consistent
  * formatting and display of addresses, timestamps, and amounts.

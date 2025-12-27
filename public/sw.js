@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumenitos-scan-v1';
+const CACHE_NAME = 'stellar-miniscan-v1';
 
 // Assets to cache on install
 const STATIC_ASSETS = [

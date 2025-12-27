@@ -1,5 +1,5 @@
 /**
- * Stellar helper utilities for Lumenitos Scan
+ * Stellar helper utilities for MiniScan
  */
 
 import * as StellarSdk from '@stellar/stellar-sdk';

@@ -3,23 +3,23 @@ import './globals.css';
 import { NetworkProvider, ServiceWorkerRegistration } from './components';
 
 export const metadata = {
-  title: 'Lumenitos Scan',
-  description: 'A Mini Stellar Token Explorer',
+  title: 'Stellar MiniScan',
+  description: 'A Minimal Stellar Token Explorer',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Lumenitos',
+    title: 'MiniScan',
   },
   openGraph: {
-    title: 'Lumenitos Scan',
-    description: 'A Mini Stellar Token Explorer',
+    title: 'Stellar MiniScan',
+    description: 'A Minimal Stellar Token Explorer',
     type: 'website',
   },
   twitter: {
     card: 'summary',
-    title: 'Lumenitos Scan',
-    description: 'A Mini Stellar Token Explorer',
+    title: 'Stellar MiniScan',
+    description: 'A Minimal Stellar Token Explorer',
   },
 };
 

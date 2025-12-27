@@ -1,10 +1,10 @@
-# Lumenitos Scan
+# Stellar MiniScan
 
 A minimal Stellar token explorer for viewing SEP-41 token balances, token activity, and transaction details on both testnet and mainnet.
 
 ## Overview
 
-Lumenitos Scan is a lightweight block explorer focused on Soroban smart contracts and SEP-41/CAP-67 token activity. It provides:
+Stellar MiniScan is a lightweight block explorer focused on Soroban smart contracts and SEP-41/CAP-67 token activity. It provides:
 
 - **Address exploration** - View token balances and activity history for any Stellar address (G.../C.../L...)
 - **CAP-67 token events** - Track transfers, mints, burns, clawbacks, and fee events
@@ -16,7 +16,7 @@ Lumenitos Scan is a lightweight block explorer focused on Soroban smart contract
 ## Architecture
 
 ```
-lumenitos-scan/
+stellar-miniscan/
 ├── app/                          # Next.js App Router pages
 │   ├── page.jsx                  # Home - search + recent activity
 │   ├── layout.js                 # Root layout with NetworkProvider

@@ -1,5 +1,5 @@
 /**
- * Pure validation functions for Lumenitos Scan
+ * Pure validation functions for Stellar MiniScan
  *
  * These functions validate Stellar addresses and other inputs.
  * They are pure functions with no side effects.

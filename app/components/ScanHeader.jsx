@@ -12,8 +12,8 @@ export default function ScanHeader() {
   return (
     <div className="scan-header">
       <div className="scan-header-left">
-        <h1><Link href="/">LUMENITOS SCAN</Link></h1>
-        <p className="subtitle">mini token explorer</p>
+        <h1><Link href="/">MINISCAN</Link></h1>
+        <p className="subtitle">a minimal stellar token explorer</p>
       </div>
       <div className="scan-header-right">
         <NetworkSelector />

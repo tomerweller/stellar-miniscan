@@ -1,6 +1,6 @@
 {
-  "name": "Lumenitos Scan",
-  "short_name": "Lumenitos",
+  "name": "Stellar MiniScan",
+  "short_name": "MiniScan",
   "description": "A Mini Stellar Token Explorer",
   "start_url": "/",
   "display": "standalone",

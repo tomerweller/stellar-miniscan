@@ -1,5 +1,5 @@
 /**
- * RPC client for Lumenitos Scan
+ * RPC client for Stellar MiniScan
  *
  * Provides a configurable RPC client for Soroban RPC calls.
  * Accepts config injection for easier testing.

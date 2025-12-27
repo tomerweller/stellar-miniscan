@@ -1,5 +1,5 @@
 /**
- * Configuration utility for Lumenitos Scan
+ * Configuration utility for Stellar MiniScan
  * Supports dynamic network switching between testnet and mainnet
  */
 
@@ -19,7 +19,7 @@ const NETWORKS = {
   },
 };
 
-const STORAGE_KEY = 'lumenitos_scan_network';
+const STORAGE_KEY = 'miniscan_network';
 const DEFAULT_NETWORK = 'testnet';
 
 /**

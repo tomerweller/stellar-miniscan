@@ -1,5 +1,5 @@
 /**
- * Lumenitos Scan utilities
+ * Stellar MiniScan utilities
  *
  * This module provides the main API for the block explorer feature.
  * It re-exports from specialized modules and provides high-level functions

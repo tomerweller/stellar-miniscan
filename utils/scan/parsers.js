@@ -1,5 +1,5 @@
 /**
- * Pure event parsing functions for Lumenitos Scan
+ * Pure event parsing functions for Stellar MiniScan
  *
  * These functions parse Stellar/Soroban event data into structured formats.
  * They are pure functions with no side effects, making them easy to test.
