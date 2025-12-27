@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import config from '@/utils/config';
 import {
@@ -31,6 +32,7 @@ import '@/app/scan.css';
 
 export default function AccountPage({ params }) {
   const { address } = use(params);
+  const router = useRouter();
   const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
   const [activity, setActivity] = useState([]); // Unified transfers + fees
@@ -504,11 +506,10 @@ export default function AccountPage({ params }) {
                                 {(item.type === 'mint' || (item.type === 'fee' && item.isRefund) || direction === 'in') && '+'}
                                 {(item.type === 'burn' || item.type === 'clawback' || (item.type === 'fee' && !item.isRefund) || direction === 'out') && '-'}
                                 {formatted.formattedAmount}{' '}
-                                {item.type === 'fee' ? (
-                                  <span>XLM</span>
-                                ) : (
-                                  <span>{formatted.symbol}</span>
-                                )}
+                                <span
+                                  className="nested-link"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/token/${item.contractId}`); }}
+                                >{formatted.symbol}</span>
                               </span>
                               {eventIndex === group.events.length - 1 && (
                                 <span className="activity-tx-link">

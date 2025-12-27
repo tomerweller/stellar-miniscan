@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   isValidAddress,
   getTokenBalance,
@@ -23,6 +24,7 @@ import '@/app/scan.css';
 
 export default function ContractPage({ params }) {
   const { address } = use(params);
+  const router = useRouter();
   const { network, isLoading: networkLoading } = useNetwork();
   const [balances, setBalances] = useState([]);
   const [transfers, setTransfers] = useState([]);
@@ -161,10 +163,20 @@ export default function ContractPage({ params }) {
   const renderTopicLink = (value) => {
     if (typeof value === 'string') {
       if (value.startsWith('G') || value.startsWith('C')) {
-        return <Link href={`/account/${value}`}>{shortenAddressSmall(value)}</Link>;
+        return (
+          <span
+            className="nested-link"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/account/${value}`); }}
+          >{shortenAddressSmall(value)}</span>
+        );
       }
       if (value.startsWith('L')) {
-        return <Link href={`/lp/${value}`}>{shortenAddressSmall(value)}</Link>;
+        return (
+          <span
+            className="nested-link"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/lp/${value}`); }}
+          >{shortenAddressSmall(value)}</span>
+        );
       }
     }
     return formatTopicValue(value);
@@ -308,7 +320,10 @@ export default function ContractPage({ params }) {
                                 {t.type === 'mint' && '+'}
                                 {(t.type === 'burn' || t.type === 'clawback') && '-'}
                                 {formatAmount(t.amount, t.contractId)}{' '}
-                                <span>{t.sacSymbol || getSymbol(t.contractId)}</span>
+                                <span
+                                  className="nested-link"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/token/${t.contractId}`); }}
+                                >{t.sacSymbol || getSymbol(t.contractId)}</span>
                               </span>
                               {eventIndex === group.events.length - 1 && (
                                 <span className="activity-tx-link">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   isValidAddress,
   getLiquidityPoolData,
@@ -22,6 +23,7 @@ import '@/app/scan.css';
 
 export default function LiquidityPoolPage({ params }) {
   const { address } = use(params);
+  const router = useRouter();
   const { network, isLoading: networkLoading } = useNetwork();
   const [poolData, setPoolData] = useState(null);
   const [transfers, setTransfers] = useState([]);
@@ -291,7 +293,10 @@ export default function LiquidityPoolPage({ params }) {
                                 {t.type === 'mint' && '+'}
                                 {(t.type === 'burn' || t.type === 'clawback') && '-'}
                                 {ft.formattedAmount}{' '}
-                                <span>{ft.symbol}</span>
+                                <span
+                                  className="nested-link"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/token/${t.contractId}`); }}
+                                >{ft.symbol}</span>
                               </span>
                               {eventIndex === group.events.length - 1 && (
                                 <span className="activity-tx-link">

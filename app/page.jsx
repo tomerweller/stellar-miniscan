@@ -266,7 +266,10 @@ export default function ScanPage() {
                             {item.type === 'burn' && '-'}
                             {item.type === 'clawback' && '-'}
                             {formatted.formattedAmount}{' '}
-                            <span>{formatted.symbol}</span>
+                            <span
+                              className="nested-link"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/token/${item.contractId}`); }}
+                            >{formatted.symbol}</span>
                           </span>
                           {eventIndex === group.events.length - 1 && (
                             <span className="activity-tx-link">
