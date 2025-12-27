@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolShareMetadata } from '@/utils/scan';
+import { getTransaction, initXdrDecoder, decodeXdr, getTokenMetadata, getPoolShareMetadata, cacheSacMetadata } from '@/utils/scan';
 import { formatOperations } from '@/utils/scan/operations';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import { getAddressPath, formatUnixTimestamp } from '@/utils/scan/helpers';
@@ -241,9 +241,34 @@ export default function TransactionPage({ params }) {
     setDecodedXdrs(decoded);
     setEvents(tokenEvents);
 
+    // Extract SAC metadata from events with 4th topic (stellar-xdr-json format)
+    // SAC transfers have topics[3] as { string: "SYMBOL:ISSUER" } or { string: "native" }
+    const sacMetadataMap = {};
+    for (const event of tokenEvents) {
+      if (event.contractId && event.topics?.length >= 4) {
+        const topic3 = event.topics[3];
+        // stellar-xdr-json encodes strings as { string: "value" }
+        const assetStr = topic3?.string;
+        if (typeof assetStr === 'string') {
+          if (assetStr.includes(':')) {
+            const symbol = assetStr.split(':')[0];
+            sacMetadataMap[event.contractId] = { symbol, name: assetStr, decimals: 7 };
+            cacheSacMetadata(event.contractId, symbol, assetStr);
+          } else if (assetStr === 'native') {
+            sacMetadataMap[event.contractId] = { symbol: 'XLM', name: 'native', decimals: 7 };
+            cacheSacMetadata(event.contractId, 'XLM', 'native');
+          }
+        }
+      }
+    }
+
     // Fetch token metadata for unique contract IDs
     const uniqueContractIds = [...new Set(tokenEvents.map(e => e.contractId).filter(Boolean))];
     const metadataPromises = uniqueContractIds.map(async (contractId) => {
+      // Use SAC metadata if available (already cached)
+      if (sacMetadataMap[contractId]) {
+        return { contractId, metadata: sacMetadataMap[contractId] };
+      }
       try {
         const metadata = await getTokenMetadata(contractId);
         return { contractId, metadata };

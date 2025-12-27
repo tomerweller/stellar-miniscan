@@ -6,6 +6,7 @@ import {
   isValidAddress,
   getTokenMetadata,
   getTokenTransfers,
+  cacheSacMetadata,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import {
@@ -48,19 +49,29 @@ export default function TokenPage({ params }) {
         getTokenTransfers(address),
       ]);
 
-      // Use metadata if available, otherwise set defaults
+      // Get transfers first so we can extract SAC metadata if needed
+      const transferList = tokenTransfers.status === 'fulfilled' ? tokenTransfers.value : [];
+      setTransfers(transferList);
+
+      // Use metadata if available
       if (tokenMetadata.status === 'fulfilled') {
         setMetadata(tokenMetadata.value);
       } else {
-        // Contract exists but isn't a token or metadata unavailable
-        setMetadata({ symbol: '???', name: 'Unknown', decimals: 7 });
-      }
-
-      // Transfers failing is a real error
-      if (tokenTransfers.status === 'fulfilled') {
-        setTransfers(tokenTransfers.value);
-      } else {
-        setTransfers([]);
+        // Metadata fetch failed - try to extract from SAC transfer events
+        // SAC transfers have sacSymbol and sacName in the 4th topic
+        const sacTransfer = transferList.find(t => t.sacSymbol);
+        if (sacTransfer) {
+          // Cache and use SAC metadata
+          cacheSacMetadata(address, sacTransfer.sacSymbol, sacTransfer.sacName);
+          setMetadata({
+            symbol: sacTransfer.sacSymbol,
+            name: sacTransfer.sacName || sacTransfer.sacSymbol,
+            decimals: 7,
+          });
+        } else {
+          // No SAC metadata available - show unknown
+          setMetadata({ symbol: '???', name: 'Unknown', decimals: 7 });
+        }
       }
     } catch (err) {
       console.error('Error loading token data:', err);

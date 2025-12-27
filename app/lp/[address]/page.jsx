@@ -6,6 +6,7 @@ import {
   isValidAddress,
   getLiquidityPoolData,
   getRecentTransfers,
+  cacheSacMetadata,
 } from '@/utils/scan';
 import { rawToDisplay, formatTokenBalance } from '@/utils/stellar/helpers';
 import {
@@ -56,6 +57,13 @@ export default function LiquidityPoolPage({ params }) {
 
       setPoolData(pool);
       setTransfers(poolTransfers);
+
+      // Cache SAC metadata from transfer events
+      for (const t of poolTransfers) {
+        if (t.sacSymbol && t.contractId) {
+          cacheSacMetadata(t.contractId, t.sacSymbol, t.sacName);
+        }
+      }
 
       // Build token info map from pool assets for transfer formatting
       const infoMap = {
