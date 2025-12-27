@@ -259,7 +259,7 @@ export async function getRecentTransfers(address, limit = 200) {
  * Uses parallel RPC queries for token events and fee events
  * @param {string} address - Address to fetch activity for
  * @param {number} limit - Maximum events to return (default 200)
- * @returns {Promise<Array>} Array of parsed activity items
+ * @returns {Promise<{activity: Array, tokenEventsFailed: boolean}>} Activity and partial failure flag
  */
 export async function getAccountActivity(address, limit = 200) {
   try {
@@ -269,8 +269,8 @@ export async function getAccountActivity(address, limit = 200) {
     const tokenFilter = buildTokenEventFilters(address);
     const feeFilter = buildFeeEventFilters(address, xlmContractId);
 
-    // Two parallel queries
-    const [tokenResult, feeResult] = await Promise.all([
+    // Two parallel queries - use allSettled so partial failures still return data
+    const [tokenResult, feeResult] = await Promise.allSettled([
       rpcCall('getEvents', {
         startLedger: startLedger,
         filters: [tokenFilter],
@@ -283,7 +283,17 @@ export async function getAccountActivity(address, limit = 200) {
       }),
     ]);
 
-    const allEvents = [...(tokenResult.events || []), ...(feeResult.events || [])];
+    // Extract events from successful results
+    const tokenEvents = tokenResult.status === 'fulfilled' ? (tokenResult.value.events || []) : [];
+    const feeEvents = feeResult.status === 'fulfilled' ? (feeResult.value.events || []) : [];
+    const tokenEventsFailed = tokenResult.status === 'rejected';
+
+    // If both failed, throw the token error (more relevant to user)
+    if (tokenResult.status === 'rejected' && feeResult.status === 'rejected') {
+      throw tokenResult.reason;
+    }
+
+    const allEvents = [...tokenEvents, ...feeEvents];
 
     const uniqueById = new Map();
     for (const event of allEvents) {
@@ -310,7 +320,7 @@ export async function getAccountActivity(address, limit = 200) {
     const activity = [...uniqueById.values()];
     activity.sort((a, b) => b.ledger - a.ledger);
 
-    return activity.slice(0, limit);
+    return { activity: activity.slice(0, limit), tokenEventsFailed };
   } catch (error) {
     console.error('Error fetching account activity:', error);
     throw error;

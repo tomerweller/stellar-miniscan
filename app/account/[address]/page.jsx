@@ -73,9 +73,13 @@ export default function AccountPage({ params }) {
         getTokenBalance(address, xlmContractId),
       ]);
 
-      // Handle activity result
+      // Handle activity result - now returns { activity, tokenEventsFailed }
       if (activityResult.status === 'fulfilled') {
-        activityList = activityResult.value;
+        const { activity, tokenEventsFailed } = activityResult.value;
+        activityList = activity;
+        if (tokenEventsFailed) {
+          activityErr = 'only showing fee events';
+        }
       } else {
         const e = activityResult.reason;
         if (e.code === -32001 || e.message?.includes('-32001')) {
@@ -421,7 +425,7 @@ export default function AccountPage({ params }) {
             </a>
           </div>
 
-          {activityError ? (
+          {activityError && activityError !== 'only showing fee events' ? (
             <p className="error">{activityError}</p>
           ) : activity.length === 0 ? (
             <p>no token activity found</p>
@@ -440,6 +444,9 @@ export default function AccountPage({ params }) {
 
             return (
               <>
+                {activityError === 'only showing fee events' && (
+                  <p className="warning">only showing fee events</p>
+                )}
                 <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
                     <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
