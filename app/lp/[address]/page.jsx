@@ -258,7 +258,7 @@ export default function LiquidityPoolPage({ params }) {
               <>
                 <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="card-item">
+                    <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
                       {group.events.map((t, eventIndex) => {
                         const ft = formatTransfer(t);
                         const typeInfo = getEventTypeInfo(t.type);
@@ -299,18 +299,18 @@ export default function LiquidityPoolPage({ params }) {
                                 {t.type === 'mint' && '+'}
                                 {(t.type === 'burn' || t.type === 'clawback') && '-'}
                                 {ft.formattedAmount}{' '}
-                                <Link href={`/token/${t.contractId}`}>{ft.symbol}</Link>
+                                <span>{ft.symbol}</span>
                               </span>
                               {eventIndex === group.events.length - 1 && (
-                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                <span className="activity-tx-link">
                                   tx:{group.txHash?.substring(0, 4)}
-                                </Link>
+                                </span>
                               )}
                             </div>
                           </div>
                         );
                       })}
-                    </div>
+                    </Link>
                   ))}
                 </div>
 

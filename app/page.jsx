@@ -227,7 +227,7 @@ export default function ScanPage() {
           <>
             <div className="card">
               {txGroups.slice(0, visibleCount).map((group) => (
-                <div key={group.txHash} className="card-item">
+                <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
                   {group.events.map((item, eventIndex) => {
                     const formatted = formatTransfer(item);
                     const typeInfo = getEventTypeInfo(item.type);
@@ -266,18 +266,18 @@ export default function ScanPage() {
                             {item.type === 'burn' && '-'}
                             {item.type === 'clawback' && '-'}
                             {formatted.formattedAmount}{' '}
-                            <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
+                            <span>{formatted.symbol}</span>
                           </span>
                           {eventIndex === group.events.length - 1 && (
-                            <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                            <span className="activity-tx-link">
                               tx:{group.txHash?.substring(0, 4)}
-                            </Link>
+                            </span>
                           )}
                         </div>
                       </div>
                     );
                   })}
-                </div>
+                </Link>
               ))}
             </div>
 

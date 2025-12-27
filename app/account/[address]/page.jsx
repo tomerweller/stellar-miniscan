@@ -442,7 +442,7 @@ export default function AccountPage({ params }) {
               <>
                 <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="card-item">
+                    <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
                       {group.events.map((item, eventIndex) => {
                         const formatted = formatActivity(item);
                         const typeInfo = getEventTypeInfo(item);
@@ -500,19 +500,19 @@ export default function AccountPage({ params }) {
                                 {item.type === 'fee' ? (
                                   <span>XLM</span>
                                 ) : (
-                                  <Link href={`/token/${item.contractId}`}>{formatted.symbol}</Link>
+                                  <span>{formatted.symbol}</span>
                                 )}
                               </span>
                               {eventIndex === group.events.length - 1 && (
-                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                <span className="activity-tx-link">
                                   tx:{group.txHash?.substring(0, 4)}
-                                </Link>
+                                </span>
                               )}
                             </div>
                           </div>
                         );
                       })}
-                    </div>
+                    </Link>
                   ))}
                 </div>
 

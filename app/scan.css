@@ -351,6 +351,18 @@
   border-bottom: none;
 }
 
+/* Clickable card item (Link) */
+a.card-item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.15s ease;
+}
+
+a.card-item:hover {
+  background-color: var(--hover-color);
+}
+
 /* Activity item in card */
 .activity-card-header {
   display: flex;

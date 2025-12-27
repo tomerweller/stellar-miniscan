@@ -7,6 +7,7 @@
   --danger-color: #dc2626;
   --background: #f8faf8;
   --surface: #ffffff;
+  --hover-color: #f0f4f0;
   --text-primary: #1a1a1a;
   --text-secondary: #6b7280;
   --border-color: #e5e7eb;
@@ -23,6 +24,7 @@
   --danger-color: #f87171;
   --background: #0D1B12;
   --surface: #1A2B1F;
+  --hover-color: #243028;
   --text-primary: #E0EADE;
   --text-secondary: #9ca3af;
   --border-color: #374151;

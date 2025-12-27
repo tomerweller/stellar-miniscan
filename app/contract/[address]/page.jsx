@@ -270,7 +270,7 @@ export default function ContractPage({ params }) {
               <>
                 <div className="card">
                   {txGroups.slice(0, visibleTransfers).map((group) => (
-                    <div key={group.txHash} className="card-item">
+                    <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
                       {group.events.map((t, eventIndex) => {
                         const typeInfo = getEventTypeInfo(t.type);
 
@@ -310,18 +310,18 @@ export default function ContractPage({ params }) {
                                 {t.type === 'mint' && '+'}
                                 {(t.type === 'burn' || t.type === 'clawback') && '-'}
                                 {formatAmount(t.amount, t.contractId)}{' '}
-                                <Link href={`/token/${t.contractId}`}>{t.sacSymbol || getSymbol(t.contractId)}</Link>
+                                <span>{t.sacSymbol || getSymbol(t.contractId)}</span>
                               </span>
                               {eventIndex === group.events.length - 1 && (
-                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                <span className="activity-tx-link">
                                   tx:{group.txHash?.substring(0, 4)}
-                                </Link>
+                                </span>
                               )}
                             </div>
                           </div>
                         );
                       })}
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
@@ -353,7 +353,7 @@ export default function ContractPage({ params }) {
             <>
               <div className="card">
                 {invocations.slice(0, visibleInvocations).map((inv, index) => (
-                  <div key={`${inv.txHash}-${index}`} className="card-item">
+                  <Link href={`/tx/${inv.txHash}`} key={`${inv.txHash}-${index}`} className="card-item">
                     <div className="activity-card-header">
                       <div className="event-type">
                         <span className={`event-dot ${inv.inSuccessfulContractCall ? '' : 'danger'}`} />
@@ -379,15 +379,15 @@ export default function ContractPage({ params }) {
                       {inv.value !== null && (
                         <span className="text-secondary">= {formatTopicValue(inv.value)}</span>
                       )}
-                      <Link href={`/tx/${inv.txHash}`} className="activity-tx-link">
+                      <span className="activity-tx-link">
                         tx:{inv.txHash?.substring(0, 4)}
-                      </Link>
+                      </span>
                     </div>
 
                     {!inv.inSuccessfulContractCall && (
                       <span className="error" style={{ fontSize: '12px' }}>[failed]</span>
                     )}
-                  </div>
+                  </Link>
                 ))}
               </div>
 

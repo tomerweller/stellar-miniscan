@@ -233,7 +233,7 @@ export default function TokenPage({ params }) {
               <>
                 <div className="card">
                   {txGroups.slice(0, visibleCount).map((group) => (
-                    <div key={group.txHash} className="card-item">
+                    <Link href={`/tx/${group.txHash}`} key={group.txHash} className="card-item">
                       {group.events.map((t, eventIndex) => {
                         const typeInfo = getEventTypeInfo(t.type);
 
@@ -277,15 +277,15 @@ export default function TokenPage({ params }) {
                                 {formatAmount(t.amount)} {getSymbol()}
                               </span>
                               {eventIndex === group.events.length - 1 && (
-                                <Link href={`/tx/${group.txHash}`} className="activity-tx-link">
+                                <span className="activity-tx-link">
                                   tx:{group.txHash?.substring(0, 4)}
-                                </Link>
+                                </span>
                               )}
                             </div>
                           </div>
                         );
                       })}
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
