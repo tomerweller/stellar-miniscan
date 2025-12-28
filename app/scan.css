@@ -47,6 +47,19 @@
   margin-top: 4px;
 }
 
+.scan-header-left .subtitle .subtitle-text,
+.scan-header-left .subtitle .ledger-range {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Hide separator when subtitle wraps on narrow screens */
+@media (max-width: 500px) {
+  .scan-header-left .subtitle .subtitle-separator {
+    display: none;
+  }
+}
+
 .scan-header-right {
   display: flex;
   gap: 8px;
