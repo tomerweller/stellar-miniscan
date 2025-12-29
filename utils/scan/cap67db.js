@@ -10,7 +10,9 @@
  * - Dedicated indexer (more reliable than RPC limits)
  */
 
-const CAP67DB_URL = 'https://159-65-224-222.sslip.io';
+import config from '../config.js';
+
+const CAP67DB_URL = config.stellar.cap67dbUrl;
 
 /**
  * Fetch events from cap67db

@@ -193,6 +193,8 @@ export default function ScanPage() {
           <span className="search-icon">🔍</span>
           <input
             type="text"
+            id="searchInput"
+            name="search"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="Search address, tx hash, or ASSET:ISSUER..."

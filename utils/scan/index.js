@@ -57,6 +57,10 @@ function getRpcClient() {
   return createRpcClient({
     rpcUrl: config.stellar.sorobanRpcUrl,
     networkPassphrase: config.networkPassphrase,
+    rpcTimeoutMs: config.rpc.timeoutMs,
+    rpcMaxRetries: config.rpc.maxRetries,
+    rpcBackoffMs: config.rpc.backoffMs,
+    rpcBackoffMaxMs: config.rpc.backoffMaxMs,
   });
 }
 
@@ -67,7 +71,12 @@ function getRpcClient() {
  * @returns {Promise<object>} RPC result
  */
 async function rpcCall(method, params) {
-  return rpcCallBase(config.stellar.sorobanRpcUrl, method, params);
+  return rpcCallBase(config.stellar.sorobanRpcUrl, method, params, {
+    timeoutMs: config.rpc.timeoutMs,
+    maxRetries: config.rpc.maxRetries,
+    backoffMs: config.rpc.backoffMs,
+    backoffMaxMs: config.rpc.backoffMaxMs,
+  });
 }
 
 /**
@@ -288,7 +297,7 @@ export async function getRecentTransfers(address, limit = 200) {
 
     return activity.slice(0, limit);
   } catch (error) {
-    console.error('Error fetching transfer history:', error);
+    console.warn('Error fetching transfer history:', error);
     throw error;
   }
 }
@@ -780,7 +789,7 @@ export async function getLiquidityPoolData(poolAddress) {
       latestLedger: result.latestLedger,
     };
   } catch (error) {
-    console.error('Error fetching liquidity pool data:', error);
+    console.warn('Error fetching liquidity pool data:', error);
     throw error;
   }
 }

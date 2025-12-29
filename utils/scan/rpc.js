@@ -12,36 +12,105 @@ import * as StellarSdk from '@stellar/stellar-sdk';
  * @param {string} rpcUrl - The RPC server URL
  * @param {string} method - RPC method name
  * @param {object} params - RPC parameters
+ * @param {object} options - RPC options
+ * @param {number} options.timeoutMs - Timeout in milliseconds
+ * @param {number} options.maxRetries - Max retry attempts
+ * @param {number} options.backoffMs - Base backoff in milliseconds
+ * @param {number} options.backoffMaxMs - Max backoff in milliseconds
  * @returns {Promise<object>} RPC result
  */
-export async function rpcCall(rpcUrl, method, params) {
-  const response = await fetch(rpcUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method,
-      params,
-    }),
-  });
+export async function rpcCall(rpcUrl, method, params, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 10000;
+  const maxRetries = options.maxRetries ?? 2;
+  const backoffMs = options.backoffMs ?? 300;
+  const backoffMaxMs = options.backoffMaxMs ?? 2000;
 
-  if (!response.ok) {
-    throw new Error(`RPC request failed: ${response.status} ${response.statusText}`);
+  const payload = {
+    jsonrpc: '2.0',
+    id: 1,
+    method,
+    params,
+  };
+
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(
+        rpcUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        },
+        timeoutMs
+      );
+
+      if (!response.ok) {
+        const error = new Error(`RPC request failed: ${response.status} ${response.statusText}`);
+        error.status = response.status;
+        error.retryable = response.status >= 500 || response.status === 429;
+        throw error;
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        const errorCode = data.error.code;
+        const errorMessage = data.error.message || JSON.stringify(data.error);
+        const error = new Error(`RPC error: [${errorCode}] ${errorMessage}`);
+        error.code = errorCode;
+        error.retryable = false;
+        throw error;
+      }
+
+      return data.result;
+    } catch (error) {
+      lastError = error;
+      const shouldRetry = attempt < maxRetries && isRetryableError(error);
+      if (!shouldRetry) {
+        throw error;
+      }
+      const backoff = Math.min(backoffMs * 2 ** attempt, backoffMaxMs);
+      const jitter = Math.floor(Math.random() * backoff * 0.25);
+      await delay(backoff + jitter);
+    }
   }
 
-  const data = await response.json();
-  if (data.error) {
-    const errorCode = data.error.code;
-    const errorMessage = data.error.message || JSON.stringify(data.error);
-    const error = new Error(`RPC error: [${errorCode}] ${errorMessage}`);
-    error.code = errorCode;
+  throw lastError;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } catch (error) {
+    if (error && error.name === 'AbortError') {
+      const timeoutError = new Error(`RPC request timed out after ${timeoutMs}ms`);
+      timeoutError.code = 'ETIMEDOUT';
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
+}
 
-  return data.result;
+function isRetryableError(error) {
+  if (!error) return false;
+  if (error.retryable) return true;
+  if (error.code === 'ETIMEDOUT' || error.isTimeout) return true;
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  return message.includes('network') || message.includes('fetch') || message.includes('timed out');
 }
 
 /**
@@ -49,10 +118,27 @@ export async function rpcCall(rpcUrl, method, params) {
  * @param {object} config - Configuration object
  * @param {string} config.rpcUrl - Soroban RPC URL
  * @param {string} config.networkPassphrase - Network passphrase
+ * @param {number} config.rpcTimeoutMs - RPC timeout in milliseconds
+ * @param {number} config.rpcMaxRetries - Max retry attempts
+ * @param {number} config.rpcBackoffMs - Base backoff in milliseconds
+ * @param {number} config.rpcBackoffMaxMs - Max backoff in milliseconds
  * @returns {object} RPC client instance
  */
 export function createRpcClient(config) {
-  const { rpcUrl, networkPassphrase } = config;
+  const {
+    rpcUrl,
+    networkPassphrase,
+    rpcTimeoutMs = 10000,
+    rpcMaxRetries = 2,
+    rpcBackoffMs = 300,
+    rpcBackoffMaxMs = 2000,
+  } = config;
+  const rpcOptions = {
+    timeoutMs: rpcTimeoutMs,
+    maxRetries: rpcMaxRetries,
+    backoffMs: rpcBackoffMs,
+    backoffMaxMs: rpcBackoffMaxMs,
+  };
 
   return {
     /**
@@ -60,7 +146,7 @@ export function createRpcClient(config) {
      * @returns {Promise<number>} Latest ledger sequence
      */
     async getLatestLedger() {
-      const result = await rpcCall(rpcUrl, 'getLatestLedger', {});
+      const result = await rpcCall(rpcUrl, 'getLatestLedger', {}, rpcOptions);
       return result.sequence;
     },
 
@@ -70,7 +156,7 @@ export function createRpcClient(config) {
      * @returns {Promise<object>} Events result
      */
     async getEvents(params) {
-      return rpcCall(rpcUrl, 'getEvents', params);
+      return rpcCall(rpcUrl, 'getEvents', params, rpcOptions);
     },
 
     /**
@@ -79,7 +165,7 @@ export function createRpcClient(config) {
      * @returns {Promise<object>} Transaction data
      */
     async getTransaction(txHash) {
-      return rpcCall(rpcUrl, 'getTransaction', { hash: txHash });
+      return rpcCall(rpcUrl, 'getTransaction', { hash: txHash }, rpcOptions);
     },
 
     /**
@@ -88,7 +174,7 @@ export function createRpcClient(config) {
      * @returns {Promise<object>} Ledger entries result
      */
     async getLedgerEntries(keys) {
-      return rpcCall(rpcUrl, 'getLedgerEntries', { keys });
+      return rpcCall(rpcUrl, 'getLedgerEntries', { keys }, rpcOptions);
     },
 
     /**

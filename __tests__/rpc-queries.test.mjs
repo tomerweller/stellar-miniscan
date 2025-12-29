@@ -6,9 +6,15 @@
  *
  * Uses actual RPC calls to testnet to verify query format is valid.
  * These tests may be slower and require network access.
+ * Set RUN_INTEGRATION=1 to enable.
  */
 
 import * as StellarSdk from '@stellar/stellar-sdk';
+
+const RUN_INTEGRATION = ['1', 'true', 'yes'].includes(
+  String(process.env.RUN_INTEGRATION || '').toLowerCase()
+);
+const describeIntegration = RUN_INTEGRATION ? describe : describe.skip;
 
 // Test network configuration
 const TEST_NETWORK = 'testnet';
@@ -42,7 +48,7 @@ async function rpcCall(method, params) {
   return data.result;
 }
 
-describe('RPC Query Structure', () => {
+describeIntegration('RPC Query Structure', () => {
   let latestLedger;
 
   beforeAll(async () => {
@@ -172,7 +178,7 @@ describe('RPC Query Structure', () => {
   });
 });
 
-describe('Regression Tests', () => {
+describeIntegration('Regression Tests', () => {
   let latestLedger;
 
   beforeAll(async () => {

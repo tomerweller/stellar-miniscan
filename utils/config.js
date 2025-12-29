@@ -3,18 +3,58 @@
  * Supports dynamic network switching between testnet and mainnet
  */
 
+const env = typeof process !== 'undefined' ? process.env : {};
+
+const getEnvString = (key, fallback) => {
+  const value = env[key];
+  if (!value || typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : fallback;
+};
+
+const getEnvNumber = (key, fallback) => {
+  const value = env[key];
+  if (!value || typeof value !== 'string') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const RPC_DEFAULTS = {
+  timeoutMs: getEnvNumber('NEXT_PUBLIC_RPC_TIMEOUT_MS', 10000),
+  maxRetries: getEnvNumber('NEXT_PUBLIC_RPC_MAX_RETRIES', 2),
+  backoffMs: getEnvNumber('NEXT_PUBLIC_RPC_BACKOFF_MS', 300),
+  backoffMaxMs: getEnvNumber('NEXT_PUBLIC_RPC_BACKOFF_MAX_MS', 2000),
+};
+
+const CAP67DB_DEFAULT_URL = getEnvString(
+  'NEXT_PUBLIC_CAP67DB_URL',
+  'https://159-65-224-222.sslip.io'
+);
+
 // Network configurations
 const NETWORKS = {
   testnet: {
     name: 'testnet',
-    sorobanRpcUrl: 'https://134-209-117-133.nip.io',
-    explorerUrl: 'https://stellar.expert/explorer/testnet',
+    sorobanRpcUrl: getEnvString(
+      'NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET',
+      'https://134-209-117-133.nip.io'
+    ),
+    explorerUrl: getEnvString(
+      'NEXT_PUBLIC_EXPLORER_URL_TESTNET',
+      'https://stellar.expert/explorer/testnet'
+    ),
     passphrase: 'Test SDF Network ; September 2015',
   },
   mainnet: {
     name: 'mainnet',
-    sorobanRpcUrl: 'https://157-230-232-173.nip.io',
-    explorerUrl: 'https://stellar.expert/explorer/public',
+    sorobanRpcUrl: getEnvString(
+      'NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET',
+      'https://157-230-232-173.nip.io'
+    ),
+    explorerUrl: getEnvString(
+      'NEXT_PUBLIC_EXPLORER_URL_MAINNET',
+      'https://stellar.expert/explorer/public'
+    ),
     passphrase: 'Public Global Stellar Network ; September 2015',
   },
 };
@@ -60,6 +100,15 @@ const config = {
       network: networkConfig.name,
       sorobanRpcUrl: networkConfig.sorobanRpcUrl,
       explorerUrl: networkConfig.explorerUrl,
+      cap67dbUrl: CAP67DB_DEFAULT_URL,
+    };
+  },
+  get rpc() {
+    return {
+      timeoutMs: RPC_DEFAULTS.timeoutMs,
+      maxRetries: RPC_DEFAULTS.maxRetries,
+      backoffMs: RPC_DEFAULTS.backoffMs,
+      backoffMaxMs: RPC_DEFAULTS.backoffMaxMs,
     };
   },
   get networkPassphrase() {

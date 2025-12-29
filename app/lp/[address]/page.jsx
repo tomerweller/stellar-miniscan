@@ -76,7 +76,7 @@ export default function LiquidityPoolPage({ params }) {
       };
       setTokenInfo(infoMap);
     } catch (err) {
-      console.error('Error loading liquidity pool data:', err);
+      console.warn('Error loading liquidity pool data:', err);
       setError(err.message);
     } finally {
       setLoading(false);

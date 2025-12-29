@@ -134,13 +134,29 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+## Configuration
+
+All configuration is optional and can be set via environment variables at build time:
+
+- `NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET`
+- `NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET`
+- `NEXT_PUBLIC_EXPLORER_URL_TESTNET`
+- `NEXT_PUBLIC_EXPLORER_URL_MAINNET`
+- `NEXT_PUBLIC_CAP67DB_URL`
+- `NEXT_PUBLIC_RPC_TIMEOUT_MS`
+- `NEXT_PUBLIC_RPC_MAX_RETRIES`
+- `NEXT_PUBLIC_RPC_BACKOFF_MS`
+- `NEXT_PUBLIC_RPC_BACKOFF_MAX_MS`
+
 ## Testing
 
 The project uses Jest with ES Modules support:
 
 ```bash
-npm test           # Run all tests
+npm test           # Run unit tests (integration tests are skipped by default)
 npm run test:watch # Run tests in watch mode
+npm run test:integration # Run live RPC integration tests (requires network)
+npm run test:coverage    # Run tests with coverage report
 ```
 
 ### Test Structure
@@ -177,7 +193,7 @@ Deployed on Vercel with automatic builds from main branch. Network selection is 
 
 ## Tech Stack
 
-- **Next.js 15 / React 19** - Latest React framework with App Router
+- **Next.js 16 / React 19** - Latest React framework with App Router
 - **Stellar SDK** - Soroban RPC client, XDR parsing
 - **stellar-xdr-json** - WASM-based XDR to JSON decoder
 - **Soroban RPC** - Uses `getEvents` API with `order: desc` for recent-first results

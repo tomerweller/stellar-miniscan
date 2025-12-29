@@ -302,6 +302,11 @@ export const formatErrorMessage = (error) => {
     return 'Network error. Please check your connection and try again.';
   }
 
+  // Timeout errors
+  if (error.includes('timed out') || error.includes('ETIMEDOUT')) {
+    return 'Request timed out. Please try again in a moment.';
+  }
+
   // Not found errors
   if (error.includes('not found') || error.includes('404')) {
     return 'Not found';
