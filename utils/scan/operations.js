@@ -18,6 +18,87 @@ export function shortenAddress(addr) {
 }
 
 /**
+ * Formats a single invoke argument value for display
+ * @param {any} arg - Argument value (can be various ScVal types)
+ * @returns {string} Formatted argument string
+ */
+function formatInvokeArg(arg) {
+  if (arg === null || arg === undefined) return 'null';
+
+  // Handle primitive types
+  if (typeof arg === 'string') {
+    // Check if it's an address
+    if (arg.startsWith('G') || arg.startsWith('C')) {
+      return shortenAddress(arg);
+    }
+    // Truncate long strings
+    if (arg.length > 20) {
+      return `"${arg.substring(0, 17)}..."`;
+    }
+    return `"${arg}"`;
+  }
+  if (typeof arg === 'number' || typeof arg === 'bigint') {
+    return String(arg);
+  }
+  if (typeof arg === 'boolean') {
+    return String(arg);
+  }
+
+  // Handle object types (ScVal decoded)
+  if (typeof arg === 'object') {
+    // Address types
+    if (arg.address || arg.Address) {
+      const addr = arg.address || arg.Address;
+      const addrStr = typeof addr === 'string' ? addr : (addr.contract_id || addr.account_id || addr.contractId || addr.accountId || '?');
+      return shortenAddress(addrStr);
+    }
+    // Integer types
+    if ('i128' in arg || 'i256' in arg || 'u128' in arg || 'u256' in arg) {
+      const val = arg.i128 || arg.i256 || arg.u128 || arg.u256;
+      if (typeof val === 'object' && (val.lo !== undefined || val.hi !== undefined)) {
+        // Combine hi/lo for large numbers - just show simplified
+        return '...';
+      }
+      return String(val);
+    }
+    if ('i32' in arg) return String(arg.i32);
+    if ('i64' in arg) return String(arg.i64);
+    if ('u32' in arg) return String(arg.u32);
+    if ('u64' in arg) return String(arg.u64);
+    // Symbol/String
+    if ('symbol' in arg || 'Symbol' in arg) return arg.symbol || arg.Symbol;
+    if ('string' in arg || 'String' in arg) {
+      const str = arg.string || arg.String;
+      return str.length > 15 ? `"${str.substring(0, 12)}..."` : `"${str}"`;
+    }
+    // Boolean
+    if ('bool' in arg || 'Bool' in arg) return String(arg.bool ?? arg.Bool);
+    // Vec/Map - just indicate they exist
+    if ('vec' in arg || 'Vec' in arg) return '[...]';
+    if ('map' in arg || 'Map' in arg) return '{...}';
+    // Bytes
+    if ('bytes' in arg || 'Bytes' in arg) return '0x...';
+  }
+
+  return '...';
+}
+
+/**
+ * Formats invoke contract arguments for display
+ * @param {Array} args - Array of argument values
+ * @returns {string} Comma-separated formatted arguments
+ */
+function formatInvokeArgs(args) {
+  if (!args || !Array.isArray(args) || args.length === 0) return '';
+  // Limit to first 3 args to keep description concise
+  const formatted = args.slice(0, 3).map(formatInvokeArg);
+  if (args.length > 3) {
+    formatted.push('...');
+  }
+  return formatted.join(', ');
+}
+
+/**
  * Formats an asset for display
  * @param {object|string} asset - Asset object with asset_code/asset_issuer or 'native'
  * @returns {string} Formatted asset string (e.g., 'XLM', 'USDC')
@@ -593,8 +674,10 @@ export function formatOperation(op) {
         const contractId = invoke.contract_address || invoke.contractAddress || invoke.contract_id || '?';
         const functionName = invoke.function_name || invoke.functionName || invoke.function || '?';
         const contractAddr = typeof contractId === 'object' ? (contractId.contract_id || contractId.contractId || '?') : contractId;
-        description = `invoke ${functionName}() on ${shortenAddress(contractAddr)}`;
-        details = { contractId: contractAddr, functionName };
+        const args = invoke.args || [];
+        const formattedArgs = args.length > 0 ? formatInvokeArgs(args) : '';
+        description = `invoke ${functionName}(${formattedArgs}) on ${shortenAddress(contractAddr)}`;
+        details = { contractId: contractAddr, functionName, args };
       } else if (hostFunction.upload_wasm || hostFunction.uploadWasm || hostFunction.UploadWasm) {
         description = 'upload wasm';
         details = { type: 'upload_wasm' };
