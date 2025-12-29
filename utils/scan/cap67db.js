@@ -33,7 +33,9 @@ export async function fetchEvents(params = {}) {
   if (params.order) url.searchParams.set('order', params.order);
   if (params.cursor) url.searchParams.set('cursor', params.cursor);
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    signal: AbortSignal.timeout(1000),
+  });
 
   if (!response.ok) {
     throw new Error(`cap67db request failed: ${response.status} ${response.statusText}`);
