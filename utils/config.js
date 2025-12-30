@@ -39,6 +39,7 @@ const NETWORKS = {
       'NEXT_PUBLIC_SOROBAN_RPC_URL_TESTNET',
       'https://134-209-117-133.nip.io'
     ),
+    sorobanRpcUrlPublic: 'https://soroban-testnet.stellar.org',
     explorerUrl: getEnvString(
       'NEXT_PUBLIC_EXPLORER_URL_TESTNET',
       'https://stellar.expert/explorer/testnet'
@@ -51,6 +52,7 @@ const NETWORKS = {
       'NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET',
       'https://157-230-232-173.nip.io'
     ),
+    sorobanRpcUrlPublic: 'https://mainnet.sorobanrpc.com',
     explorerUrl: getEnvString(
       'NEXT_PUBLIC_EXPLORER_URL_MAINNET',
       'https://stellar.expert/explorer/public'
@@ -99,6 +101,7 @@ const config = {
     return {
       network: networkConfig.name,
       sorobanRpcUrl: networkConfig.sorobanRpcUrl,
+      sorobanRpcUrlPublic: networkConfig.sorobanRpcUrlPublic,
       explorerUrl: networkConfig.explorerUrl,
       cap67dbUrl: CAP67DB_DEFAULT_URL,
     };

@@ -581,12 +581,25 @@ export async function getContractInvocations(contractId, limit = 200) {
 // ============================================
 
 /**
- * Get transaction details from RPC
+ * Get transaction details from RPC with failover to public RPC
  * @param {string} txHash - The transaction hash
  * @returns {Promise<object>} Transaction data
  */
 export async function getTransaction(txHash) {
-  const result = await rpcCall('getTransaction', { hash: txHash });
+  const rpcOptions = {
+    timeoutMs: config.rpc.timeoutMs,
+    maxRetries: config.rpc.maxRetries,
+    backoffMs: config.rpc.backoffMs,
+    backoffMaxMs: config.rpc.backoffMaxMs,
+  };
+
+  let result;
+  try {
+    result = await rpcCallBase(config.stellar.sorobanRpcUrl, 'getTransaction', { hash: txHash }, rpcOptions);
+  } catch (error) {
+    console.warn('Primary RPC failed for getTransaction, trying public RPC:', error.message);
+    result = await rpcCallBase(config.stellar.sorobanRpcUrlPublic, 'getTransaction', { hash: txHash }, rpcOptions);
+  }
 
   if (result.status === 'NOT_FOUND') {
     return {
