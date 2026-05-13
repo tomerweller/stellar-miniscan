@@ -43,7 +43,6 @@ import {
   buildTransfersOnlyFilters,
 } from './rpc.js';
 import { storageManager } from './storage.js';
-import * as cap67db from './cap67db.js';
 
 // XDR decoder state (lazy loaded WASM)
 let xdrDecoderModule = null;
@@ -251,26 +250,11 @@ export async function getTokenMetadata(tokenContractId, { rpcServer } = {}) {
 
 /**
  * Get recent token activity for an address (any token)
- * Uses cap67db for mainnet, falls back to RPC for testnet or on failure
  * @param {string} address - Address to fetch activity for
  * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed token events
  */
 export async function getRecentTransfers(address, limit = 200) {
-  // Try cap67db for mainnet
-  if (!config.isTestnet) {
-    try {
-      const activity = await cap67db.getAddressActivity(address, limit);
-      if (activity.length > 0) {
-        return activity;
-      }
-      // Empty result - fall through to RPC (cap67db might not have data yet)
-    } catch (error) {
-      console.warn('cap67db failed, falling back to RPC:', error.message);
-    }
-  }
-
-  // Fallback to RPC
   try {
     const startLedger = await getLatestLedger();
     const filter = buildTokenEventFilters(address);
@@ -304,24 +288,11 @@ export async function getRecentTransfers(address, limit = 200) {
 
 /**
  * Get unified account activity (transfers, mint, burn, clawback + fees)
- * Uses cap67db for mainnet, falls back to RPC for testnet or on failure
  * @param {string} address - Address to fetch activity for
  * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<{activity: Array, tokenEventsFailed: boolean}>} Activity and partial failure flag
  */
 export async function getAccountActivity(address, limit = 200) {
-  // Try cap67db for mainnet
-  if (!config.isTestnet) {
-    try {
-      const activity = await cap67db.getAddressActivityWithFees(address, limit);
-      // cap67db returns combined results, no partial failures
-      return { activity, tokenEventsFailed: false };
-    } catch (error) {
-      console.warn('cap67db failed, falling back to RPC:', error.message);
-    }
-  }
-
-  // Fallback to RPC
   try {
     const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
     const startLedger = await getLatestLedger();
@@ -389,22 +360,11 @@ export async function getAccountActivity(address, limit = 200) {
 
 /**
  * Get fee events for an address (CAP-67)
- * Uses cap67db for mainnet, falls back to RPC for testnet or on failure
  * @param {string} address - Address to fetch fee events for
  * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed fee events
  */
 export async function getFeeEvents(address, limit = 200) {
-  // Try cap67db for mainnet
-  if (!config.isTestnet) {
-    try {
-      return await cap67db.getAddressFeeEvents(address, limit);
-    } catch (error) {
-      console.warn('cap67db failed, falling back to RPC:', error.message);
-    }
-  }
-
-  // Fallback to RPC
   try {
     const xlmContractId = StellarSdk.Asset.native().contractId(config.networkPassphrase);
     const startLedger = await getLatestLedger();
@@ -430,21 +390,10 @@ export async function getFeeEvents(address, limit = 200) {
 
 /**
  * Get recent token activity across all contracts (network-wide)
- * Uses cap67db for mainnet, falls back to RPC for testnet or on failure
  * @param {number} limit - Maximum events to return (default 50)
  * @returns {Promise<Array>} Array of parsed token events
  */
 export async function getRecentTokenActivity(limit = 50) {
-  // Try cap67db for mainnet
-  if (!config.isTestnet) {
-    try {
-      return await cap67db.getNetworkActivity(limit);
-    } catch (error) {
-      console.warn('cap67db failed, falling back to RPC:', error.message);
-    }
-  }
-
-  // Fallback to RPC
   const startLedger = await getLatestLedger();
 
   const parseEvents = (events) => {
@@ -492,26 +441,11 @@ export async function getRecentTokenActivity(limit = 50) {
 
 /**
  * Get recent activity for a specific token contract
- * Uses cap67db for mainnet, falls back to RPC for testnet or on failure
  * @param {string} tokenContractId - Token contract ID
  * @param {number} limit - Maximum events to return (default 200)
  * @returns {Promise<Array>} Array of parsed token events
  */
 export async function getTokenTransfers(tokenContractId, limit = 200) {
-  // Try cap67db for mainnet
-  if (!config.isTestnet) {
-    try {
-      const activity = await cap67db.getContractActivity(tokenContractId, limit);
-      if (activity.length > 0) {
-        return activity;
-      }
-      // Empty result - fall through to RPC (cap67db might not have data yet)
-    } catch (error) {
-      console.warn('cap67db failed, falling back to RPC:', error.message);
-    }
-  }
-
-  // Fallback to RPC
   try {
     const startLedger = await getLatestLedger();
     const filter = buildTokenActivityFilters(tokenContractId);
@@ -581,40 +515,12 @@ export async function getContractInvocations(contractId, limit = 200) {
 // ============================================
 
 /**
- * Get transaction details from RPC with failover to public RPC
- * Falls back to public RPC on error OR if primary returns NOT_FOUND
- * (since the primary RPC may have a shorter retention window)
+ * Get transaction details from RPC
  * @param {string} txHash - The transaction hash
  * @returns {Promise<object>} Transaction data
  */
 export async function getTransaction(txHash) {
-  const rpcOptions = {
-    timeoutMs: config.rpc.timeoutMs,
-    maxRetries: config.rpc.maxRetries,
-    backoffMs: config.rpc.backoffMs,
-    backoffMaxMs: config.rpc.backoffMaxMs,
-  };
-
-  let result;
-  try {
-    result = await rpcCallBase(config.stellar.sorobanRpcUrl, 'getTransaction', { hash: txHash }, rpcOptions);
-  } catch (error) {
-    console.warn('Primary RPC failed for getTransaction, trying public RPC:', error.message);
-    result = await rpcCallBase(config.stellar.sorobanRpcUrlPublic, 'getTransaction', { hash: txHash }, rpcOptions);
-  }
-
-  // If primary returned NOT_FOUND, try public RPC (may have longer retention)
-  if (result.status === 'NOT_FOUND') {
-    try {
-      const publicResult = await rpcCallBase(config.stellar.sorobanRpcUrlPublic, 'getTransaction', { hash: txHash }, rpcOptions);
-      if (publicResult.status !== 'NOT_FOUND') {
-        result = publicResult;
-      }
-    } catch (error) {
-      console.warn('Public RPC fallback failed:', error.message);
-      // Keep the original NOT_FOUND result
-    }
-  }
+  const result = await rpcCall('getTransaction', { hash: txHash });
 
   if (result.status === 'NOT_FOUND') {
     return {

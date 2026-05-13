@@ -31,8 +31,7 @@ Stellar MiniScan is a minimal web explorer for Stellar accounts, Soroban contrac
 - `/tx/[hash]`: decoded transaction + events.
 
 ## 6) Data Sources
-- cap67db (mainnet): preferred for recent token activity (faster/cheaper).
-- Soroban RPC: fallback for token activity; canonical for tx, ledger, and pool data.
+- Soroban RPC: canonical source for tx, ledger, events, and pool data.
 - Stellar SDK: XDR decode + network passphrases.
 
 ## 7) Core Flows
@@ -55,7 +54,6 @@ Stellar MiniScan is a minimal web explorer for Stellar accounts, Soroban contrac
 ## 9) Error Handling
 - RPC timeouts show a friendly message.
 - Processing limit errors surfaced as "Too much data to process...".
-- cap67db errors fall back to RPC silently (warn only).
 - Invalid inputs show clear validation errors.
 
 ## 10) Configuration
@@ -64,7 +62,6 @@ All config is optional and set via environment variables at build time:
 - `NEXT_PUBLIC_SOROBAN_RPC_URL_MAINNET`
 - `NEXT_PUBLIC_EXPLORER_URL_TESTNET`
 - `NEXT_PUBLIC_EXPLORER_URL_MAINNET`
-- `NEXT_PUBLIC_CAP67DB_URL`
 - `NEXT_PUBLIC_RPC_TIMEOUT_MS`
 - `NEXT_PUBLIC_RPC_MAX_RETRIES`
 - `NEXT_PUBLIC_RPC_BACKOFF_MS`
