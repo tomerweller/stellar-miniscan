@@ -44,12 +44,28 @@ export default function ScanPage() {
       const transfers = await getRecentTokenActivity(200);
       setActivity(transfers);
 
-      // Extract unique contract IDs and fetch metadata
-      const contractIds = extractContractIds(transfers);
       const infoMap = {};
 
+      // SAC contracts carry symbol in the event topic and always use 7 decimals,
+      // so we can populate metadata from the events themselves without burning
+      // getTokenMetadata's simulateTransaction calls.
+      const sacContractIds = new Set();
+      for (const t of transfers) {
+        if (t.contractId && t.sacSymbol && !sacContractIds.has(t.contractId)) {
+          sacContractIds.add(t.contractId);
+          infoMap[t.contractId] = {
+            symbol: t.sacSymbol === 'native' ? 'XLM' : t.sacSymbol,
+            decimals: 7,
+          };
+        }
+      }
+
+      const nonSacContractIds = extractContractIds(transfers).filter(
+        (id) => !sacContractIds.has(id)
+      );
+
       await Promise.all(
-        contractIds.map(async (contractId) => {
+        nonSacContractIds.map(async (contractId) => {
           try {
             const metadata = await getTokenMetadata(contractId);
             infoMap[contractId] = {
